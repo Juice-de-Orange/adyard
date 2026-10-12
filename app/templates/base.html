@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}MaxAds{% endblock %}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📣</text></svg>">
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="/static/dashboard.js" defer></script>
 <style>
   :root{
     /* Advertising neon: loud but legible. UI only -- data fills below. */
@@ -81,6 +81,9 @@
   }
   code, .mono{ font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
 </style>
+{# After the <style> above, where the Play CDN used to inject it: where a utility and
+   one of the classes above set the same property, the utility keeps winning. #}
+<link rel="stylesheet" href="/static/tailwind.css">
 </head>
 <body class="h-full">
 {% block body %}{% endblock %}

@@ -48,7 +48,7 @@
         <h3 class="text-xl font-black">{{ name }}</h3>
       </div>
       <p class="text-sm font-semibold mb-3" style="color:var(--ink-soft)">{{ text }}</p>
-      <input readonly value='{{ code }}' class="field mono text-xs" onclick="this.select()">
+      <input readonly value='{{ code }}' class="field mono text-xs" data-select>
     </div>
     {% endfor %}
   </section>

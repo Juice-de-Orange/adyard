@@ -5,6 +5,58 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- `X-Forwarded-For` is believed only from the reverse proxies listed in the new
+  setting `MAXADS_TRUSTED_PROXIES` (default `127.0.0.1,::1`). Before, any client
+  could send a different address with every request and inflate impressions and
+  clicks past the per-day deduplication (#2). Behind a proxy that is not on the
+  same machine (for example a proxy container in front of the Docker setup), set
+  this to the proxy's address or network. The Docker image and the systemd unit
+  now start uvicorn with `--no-proxy-headers`, so the setting is the only place
+  that decides.
+- Password guessing on the dashboard login is slowed down: after five failed
+  logins from one client address or for one account name, further attempts are
+  answered with `429 Too Many Requests` and `Retry-After` for 30 seconds,
+  doubling with every further failure up to 15 minutes; a successful login
+  clears the count. The counters are kept in memory only.
+- The dashboard no longer loads Tailwind's Play CDN script from a third party:
+  the stylesheet is prebuilt into `app/static/` (`scripts/build-css.sh`), the
+  page behaviour moved from inline handlers to `app/static/dashboard.js`, and
+  dashboard pages send a Content-Security-Policy that allows script only from
+  the service itself (#1).
+
+### Fixed
+
+- Moving the data directory (`MAXADS_BASE`) no longer breaks every banner: media
+  paths are stored relative to it. Paths that v0.1 stored absolute are converted
+  on the first start of this version, as long as they lie under the configured
+  data directory; anything else is left as it is and logged. So update first,
+  then move the directory.
+- A banner that was paused or deleted no longer leaves an empty box on host
+  pages that still have its embed script cached (up to five minutes): the
+  script removes its box when the media does not load (#11).
+- The Docker image is named after the Compose project (`<project>-app`) instead
+  of the fixed `maxads:local`, so two checkouts on one host no longer overwrite
+  each other's image (#11). The old `maxads:local` image can be removed with
+  `docker image rm maxads:local`.
+
+### Added
+
+- `python -m app.backup <dir>` (or `-` for stdout) writes one tar with a
+  consistent copy of the database, the originals, the media and the generated
+  secrets, safe while the service runs; `python -m app.restore <file>` (or `-`)
+  checks it and puts it back, moving the current data aside instead of deleting
+  it. README and the systemd guide describe backup, restore and update (#4).
+- Accounts can be removed from the dashboard (✕ next to the name, with a
+  confirmation). Their banners stay on air and, like the accounts they created,
+  move to whoever removed them. Nobody can remove their own account or the last
+  one (#3).
+
+- Web service and worker warn at start about `MAXADS_` variables they do not
+  know, with the closest known name (a typo used to leave the default in place
+  without a word).
+
 ## [0.1.0] - 2026-10-06
 
 ### Added

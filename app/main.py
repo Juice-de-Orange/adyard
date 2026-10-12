@@ -12,11 +12,15 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile, 
 from fastapi.responses import (
     FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response,
 )
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from . import auth, config, db, media, stats
+from .ratelimit import LoginThrottle
 
 log = logging.getLogger("maxads.web")
 
@@ -25,9 +29,41 @@ templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 SLUG_RE = re.compile(r"^[a-z0-9]{12}$")
 
+# For the dashboard pages. Script only from our own /static -- no inline script,
+# no third party. Inline styles stay allowed: the templates use style attributes
+# throughout, and a style cannot run code. /frame/ is exempt: it is meant to be
+# embedded on foreign pages and carries its own small beacon script.
+DASHBOARD_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; media-src 'self'; object-src 'none'; base-uri 'none'; "
+    "form-action 'self'; frame-ancestors 'none'"
+)
+
+
+class DashboardCSP:
+    """Adds DASHBOARD_CSP to every HTML response outside /frame/."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http" or scope["path"].startswith("/frame/"):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_csp(message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                if headers.get("content-type", "").startswith("text/html"):
+                    headers.setdefault("Content-Security-Policy", DASHBOARD_CSP)
+            await send(message)
+
+        await self.app(scope, receive, send_with_csp)
+
 
 def create_app() -> FastAPI:
     config.require_mount()
+    proxies = config.trusted_proxies()
     config.ensure_dirs()
     logging.basicConfig(
         level=logging.INFO,
@@ -37,6 +73,9 @@ def create_app() -> FastAPI:
             logging.StreamHandler(sys.stdout),
         ],
     )
+
+    for warning in config.unknown_settings():
+        log.warning(warning)
 
     db.migrate()
     secret = config.SECRET_KEY or config.load_or_create_secret(
@@ -62,6 +101,7 @@ def create_app() -> FastAPI:
 
     application = FastAPI(title="MaxAds", docs_url=None, redoc_url=None)
     application.state.count_salt = count_salt
+    application.state.login_throttle = LoginThrottle()
 
     # Ads are embedded on foreign sites, so delivery must be open to any origin.
     application.add_middleware(
@@ -76,6 +116,13 @@ def create_app() -> FastAPI:
         SessionMiddleware, secret_key=secret, same_site="lax", https_only=False,
         session_cookie="maxads_session",
     )
+    application.add_middleware(DashboardCSP)
+    # Added last, so it runs first: everything after it sees the real client in
+    # request.client. The Docker image and the systemd unit start uvicorn with
+    # --no-proxy-headers, so this is the only place that decides.
+    application.add_middleware(ProxyHeadersMiddleware, trusted_hosts=proxies)
+    log.info("X-Forwarded-For is trusted from: %s", ", ".join(proxies) or "nobody")
+    application.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
     register_routes(application)
     return application
 
@@ -131,10 +178,9 @@ def wake_worker() -> None:
 
 
 def client_ip(request: Request) -> str:
-    """Real client IP when running behind a reverse proxy."""
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """The client address. Behind a trusted proxy (MAXADS_TRUSTED_PROXIES) the
+    proxy middleware has already put the forwarded address here; a header from
+    anyone else never gets this far."""
     return request.client.host if request.client else "0.0.0.0"
 
 
@@ -205,9 +251,22 @@ def register_routes(app: FastAPI) -> None:
 
     @app.post("/login")
     def login(request: Request, username: str = Form(...), password: str = Form(...)):
+        throttle = request.app.state.login_throttle
+        address = client_ip(request)
+        wait = throttle.retry_after(address, username)
+        if wait:
+            # The password is not even checked: a lock that still answered
+            # "right" or "wrong" would let the guessing go on.
+            log.warning("login for %r refused for %ds after repeated failures", username, wait)
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"error": f"Too many failed logins. Try again in {wait} seconds."},
+                status_code=429, headers={"Retry-After": str(wait)},
+            )
         with db.session() as conn:
             user = auth.authenticate(conn, username, password)
         if user is None:
+            throttle.failure(address, username)
             # Without the client address on purpose: the log files are storage
             # too, and the service promises not to keep IP addresses.
             log.warning("failed login for %r", username)
@@ -215,6 +274,7 @@ def register_routes(app: FastAPI) -> None:
                 request, "login.html", {"error": "Wrong username or password."},
                 status_code=401,
             )
+        throttle.success(address, username)
         request.session["uid"] = user["id"]
         if user["must_change_password"]:
             return RedirectResponse("/password", status_code=303)
@@ -307,7 +367,7 @@ def register_routes(app: FastAPI) -> None:
                 "INSERT INTO ads(slug, title, target_url, kind, raw_path, created_by) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 (slug, title.strip() or slug, target_url.strip(), kind,
-                 str(raw_path), user["id"]),
+                 config.stored_path(raw_path), user["id"]),
             )
             conn.execute("INSERT INTO jobs(ad_id) VALUES (?)", (cur.lastrowid,))
         wake_worker()
@@ -328,7 +388,7 @@ def register_routes(app: FastAPI) -> None:
                 raise HTTPException(404)
             for key in ("raw_path", "media_path", "thumb_path"):
                 if ad[key]:
-                    Path(ad[key]).unlink(missing_ok=True)
+                    config.media_file(ad[key]).unlink(missing_ok=True)
             conn.execute("DELETE FROM ads WHERE id = ?", (ad["id"],))
         log.info("ad %s deleted by %s", slug, user["username"])
         return RedirectResponse("/", status_code=303)
@@ -348,6 +408,18 @@ def register_routes(app: FastAPI) -> None:
         log.info("user %r created by %s", username, user["username"])
         return RedirectResponse("/", status_code=303)
 
+    @app.post("/users/{user_id}/delete")
+    def remove_user(request: Request, user_id: int, user: dict = Depends(require_user)):
+        with db.session() as conn:
+            try:
+                username, moved = auth.delete_user(conn, user_id, acting_id=user["id"])
+            except LookupError:
+                return render_dashboard(request, user, "That account does not exist (any more).", 404)
+            except auth.AccountError as exc:
+                return render_dashboard(request, user, str(exc), 400)
+        log.info("user %r removed by %s, %d banner(s) handed over", username, user["username"], moved)
+        return RedirectResponse("/", status_code=303)
+
     # ---------------- public delivery ----------------
 
     @app.get("/m/{slug}")
@@ -356,7 +428,7 @@ def register_routes(app: FastAPI) -> None:
             ad = ad_by_slug(conn, slug)
             if ad is None:
                 raise HTTPException(404)
-            path = Path(ad["thumb_path"] if thumb else ad["media_path"])
+            path = config.media_file(ad["thumb_path"] if thumb else ad["media_path"])
         if not path.exists():
             raise HTTPException(404)
         media_type = "image/webp" if path.suffix == ".webp" else "video/mp4"
@@ -479,9 +551,9 @@ def register_routes(app: FastAPI) -> None:
             if ad is None:
                 raise HTTPException(404)
             record_event(request, conn, ad["id"], "impression")
-            path = Path(ad["media_path"])
+            path = config.media_file(ad["media_path"])
             kind = ad["kind"]
-            thumb = Path(ad["thumb_path"]) if ad["thumb_path"] else None
+            thumb = config.media_file(ad["thumb_path"]) if ad["thumb_path"] else None
         # A video cannot be shown in an <img>; its thumbnail can.
         served = path if kind == "image" else (thumb or path)
         if not served.exists():

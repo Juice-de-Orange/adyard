@@ -65,6 +65,21 @@ Telling visitors apart needs no more than a hash of IP, user agent, **the date**
 and a secret. The next day the same visitor cannot be recognised. The numbers
 stay useful without the service becoming a visitor log.
 
+## Why the login throttle counts twice, and only in memory
+
+Password guessing is slowed per client address *and* per account name: one
+address trying many names hits the first, many addresses trying one account
+(easy behind a proxy that forwards whatever address it is given) hit the
+second. After five failures a key is locked for 30 s, each further failure
+doubles that up to 15 minutes, and while locked not even the right password is
+checked — a lock that still answered "right" or "wrong" would not stop anything.
+A successful login clears both keys.
+
+The counters are in memory (`app/ratelimit.py`), bounded in size and forgotten
+after a day without failures. MaxAds runs one web process, so that is exact;
+it also means the client addresses involved never reach the database or a log
+file. A restart forgets them.
+
 ## Why browser compatibility beats file size
 
 Video processing never delivers more bytes than were uploaded — **unless** the
@@ -128,6 +143,12 @@ by one, each in a transaction.
 > no-op and makes a half-applied migration impossible to roll back. Hence
 > `split_statements()`.
 
+File paths in `ads` (`raw_path`, `media_path`, `thumb_path`) are relative to
+`$MAXADS_BASE`, so the data directory can move — another disk, a container
+volume, a restore on a new host. v0.1 stored them absolute; every start converts
+the ones under the current data directory (`relativize_media_paths()`, idempotent)
+and logs, without touching, any that lie elsewhere.
+
 | Table | Purpose |
 |---|---|
 | `users` | login; every user has full rights |
@@ -140,10 +161,14 @@ by one, each in a transaction.
 
 ## What is deliberately missing
 
-- **No built-in backup.** Back up the data directory (`$MAXADS_BASE`) with the
-  tool you already use; the SQLite file is safe to copy with `sqlite3 .backup`.
+- **No scheduled backup.** `python -m app.backup` writes one consistent tar
+  (database through SQLite's online backup API, originals, media, generated
+  secrets) and `python -m app.restore` puts it back, moving the current data aside
+  instead of deleting it; when and where to keep backups is up to you.
 - **No public registration.** The first admin is created at start-up, further
   accounts only from the dashboard.
 - **No roles.** Every account can do everything — it is a tool for a small team.
-- **No user deletion** in the interface. On the database it works; `ads.created_by`
-  has to be reassigned first, or the foreign key blocks it.
+- **No account removes itself, and the last account stays.** Removing an account
+  (✕ in "The ad crew") hands its banners — which keep running — and the accounts
+  it created to whoever removes it; `ads.created_by` and `users.created_by` both
+  reference `users(id)`.

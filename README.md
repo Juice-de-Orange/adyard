@@ -56,6 +56,76 @@ For a public setup, put the service behind a reverse proxy with TLS and set
 `MAXADS_PUBLIC_URL` (e.g. `https://ads.example.com`) — the embed snippets point
 there. Running it without Docker: [docs/deploy/systemd.md](docs/deploy/systemd.md).
 
+Visitors are told apart by their address, so MaxAds believes `X-Forwarded-For`
+only from the peers in `MAXADS_TRUSTED_PROXIES` (default `127.0.0.1,::1`: a proxy
+on the same machine, the systemd setup). Reached directly, as in the quick start,
+nothing needs setting — a forged header is ignored. Behind a proxy in front of
+the Docker setup, its connections arrive from a Docker network, so set the
+proxy's container address or that network (e.g. `172.16.0.0/12`, the range Docker
+uses for its bridge networks); otherwise every visitor looks like the proxy and
+is counted once a day. Trust nothing wider than you have to: any peer in the list
+can claim any address.
+
+## Backup, restore and update
+
+Commands for the Docker setup, run in the checkout. Without Docker:
+[docs/deploy/systemd.md](docs/deploy/systemd.md#backup-and-restore).
+
+**Backup** — while the service runs:
+
+```bash
+(umask 077; docker compose exec -T web python -m app.backup - > maxads-backup-$(date +%Y%m%d-%H%M%S).tar)
+```
+
+One tar file with a consistent copy of the database (SQLite's online backup
+API, so nothing that still sits in the write-ahead log is missed), the originals,
+the delivered media and the generated session key and visitor salt. Logs are not
+included. It holds password hashes and secrets: keep it private (`umask 077`
+makes the file readable for you only). To write it into
+the data volume instead, give a directory: `python -m app.backup /data/backups`.
+
+**Restore** — into the same or a brand-new installation (after
+`docker compose down -v`, too):
+
+```bash
+docker compose stop web worker
+docker compose run --rm -T --no-deps web python -m app.restore - < maxads-backup-20261012-120000.tar
+docker compose up -d
+```
+
+The backup is unpacked and checked first; only then is the current data replaced.
+Nothing is deleted: what was there before is moved to
+`/data/pre-restore-<time>/` in the volume. Remove it once all is well:
+`docker compose exec web rm -rf /data/pre-restore-<time>`. The restore refuses to
+run while web or worker still has the database open.
+
+**Update** — take a backup, then:
+
+```bash
+git pull
+docker compose up -d --build
+docker compose logs --tail 20 web worker
+```
+
+Database changes are applied when the service starts. To pin a release, use
+`git fetch --tags && git checkout v<version>` instead of `git pull`.
+
+*Coming from v0.1.0*, which has no backup command yet: take a cold copy of the
+data volume first, then update as above.
+
+```bash
+docker compose stop web worker
+(umask 077; docker compose run --rm -T --no-deps web tar -C /data -cf - . > maxads-v0.1-data.tar)
+```
+
+(To go back: check out `v0.1.0`, `docker compose build`, `docker compose stop web worker`,
+then `docker compose run --rm -T --no-deps web tar -C /data -xf - < maxads-v0.1-data.tar`
+and `docker compose up -d`.) The first start of the new version converts the stored media paths to paths
+relative to the data directory and says so in the log of whichever of web and
+worker starts first (`docker compose logs | grep "media path"` shows
+`… media path(s) converted to relative`); from then on the data directory can move. Move it only after that
+first start.
+
 ## Embedding
 
 ```html
@@ -112,7 +182,7 @@ On the original deployment, idle for 60 s:
 ## Tech stack
 
 Python 3.13 · FastAPI · Jinja2 · SQLite · Pillow · ffmpeg · argon2 · Docker /
-systemd · Tailwind (Play CDN, see the open issue).
+systemd · Tailwind CSS (prebuilt into `app/static/`, nothing loaded from a CDN).
 
 ## Development
 
@@ -134,6 +204,10 @@ uvicorn app.main:create_app --factory --reload &
 python -m app.worker
 ```
 
+Changed CSS classes in a template? Rebuild the stylesheet with
+`sh scripts/build-css.sh` (downloads the pinned standalone Tailwind CLI once, no
+Node.js needed) and commit `app/static/tailwind.css`; CI checks that it matches.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and the pre-commit secret
 guard.
 
@@ -146,7 +220,24 @@ Feature-complete for its purpose; open ideas are in the
 Checked on a fresh clone with the Docker quick start and a real browser (upload, conversion,
 delivery, embed on another origin, statistics, pause, delete, restart). Not verified in that check:
 the systemd installation from `docs/deploy/`, operation behind a reverse proxy with TLS, and browsers
-other than Chromium. There is no built-in backup; back up the data volume.
+other than Chromium.
+
+### Known limitations
+
+- **The login throttle counts in memory.** After five failed logins from one
+  address or for one account name, further attempts get `429` for 30 seconds,
+  doubling with every further failure (up to 15 minutes). The counters live in
+  the single web process: a restart forgets them, and someone guessing can also
+  lock the real owner of that account name out for that time.
+- **No roles.** Every account can do everything, including removing other
+  accounts.
+- **Browser caches.** A visitor's browser keeps a delivered banner for up to a
+  day, so a paused or deleted banner can still appear for someone who saw it
+  before; the embed script itself is cached for five minutes.
+- **The generated first password** lives only in the container log (see Quick
+  start).
+- **Not verified on a real host:** the systemd units and the systemd backup and
+  restore commands in `docs/deploy/` (their Python parts were run, systemd was not).
 
 ## Built with Claude Code
 

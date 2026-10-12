@@ -3,12 +3,19 @@
 One connection per request/worker loop; SQLite in WAL mode handles the
 concurrency between the web process and the media worker.
 """
+import logging
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
 from . import config
+
+log = logging.getLogger("maxads.db")
+
+# The columns that point at files in the data directory.
+MEDIA_COLUMNS = ("raw_path", "media_path", "thumb_path")
 
 # Each migration runs exactly once, in order. Never edit an applied one -- append.
 MIGRATIONS: list[tuple[str, str]] = [
@@ -166,4 +173,58 @@ def migrate() -> list[str]:
                     pass
                 raise
             applied.append(name)
+        relativize_media_paths(conn)
     return applied
+
+
+def _relative_to_base(value: str) -> str | None:
+    """`value` relative to BASE_DIR, or None when it lies outside."""
+    path = Path(os.path.normpath(value))
+    base = Path(os.path.abspath(config.BASE_DIR))
+    for candidate in (base, base.resolve()):
+        try:
+            return path.relative_to(candidate).as_posix()
+        except ValueError:
+            continue
+    return None
+
+
+def relativize_media_paths(conn: sqlite3.Connection) -> int:
+    """Rewrite absolute media paths under BASE_DIR as relative ones.
+
+    Up to v0.1 the paths were stored absolute, so moving the data directory broke
+    every banner. Runs on every start and is idempotent: once converted, there is
+    nothing left to match. A path outside BASE_DIR is left alone and logged --
+    guessing where such a file went could point a banner at the wrong one.
+    Returns the number of converted paths.
+    """
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        rows = conn.execute(
+            "SELECT id, slug, raw_path, media_path, thumb_path FROM ads WHERE "
+            + " OR ".join(f"{col} LIKE '/%'" for col in MEDIA_COLUMNS)
+        ).fetchall()
+        converted = 0
+        for row in rows:
+            for col in MEDIA_COLUMNS:
+                value = row[col]
+                if not value or not os.path.isabs(value):
+                    continue
+                relative = _relative_to_base(value)
+                if relative is None:
+                    log.warning(
+                        "ad %s: %s %s is outside the data directory %s and was left "
+                        "as it is -- the banner breaks if that path goes away",
+                        row["slug"], col, value, config.BASE_DIR,
+                    )
+                    continue
+                conn.execute(f"UPDATE ads SET {col} = ? WHERE id = ?", (relative, row["id"]))
+                converted += 1
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    if converted:
+        log.info("%d media path(s) converted to relative (data directory %s)",
+                 converted, config.BASE_DIR)
+    return converted

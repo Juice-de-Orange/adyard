@@ -45,3 +45,24 @@ def admin_client(client, app_env):
                     follow_redirects=False)
     assert r.status_code == 303, r.text
     return client
+
+
+@pytest.fixture()
+def make_ad(app_env):
+    """Upload a small image through `client` and run the worker on it; returns the slug."""
+    def make(client, title="Banner", target="https://example.com/x", size=(300, 100)):
+        from PIL import Image
+        from app import db
+        from app.worker import claim_job, process
+
+        src = Path(app_env) / f"{title}.png"
+        Image.new("RGB", size, (10, 90, 200)).save(src)
+        with src.open("rb") as fh:
+            r = client.post("/ads", data={"title": title, "target_url": target},
+                            files={"file": (f"{title}.png", fh, "image/png")},
+                            follow_redirects=False)
+        assert r.status_code == 303, r.text
+        with db.session() as conn:
+            process(conn, claim_job(conn))
+            return conn.execute("SELECT slug FROM ads ORDER BY id DESC LIMIT 1").fetchone()["slug"]
+    return make

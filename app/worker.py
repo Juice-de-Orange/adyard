@@ -11,7 +11,6 @@ import select
 import signal
 import sys
 import time
-from pathlib import Path
 
 from . import config, db, media
 
@@ -117,7 +116,7 @@ def process(conn, job: dict) -> None:
                      (job["id"],))
         return
 
-    src = Path(ad["raw_path"])
+    src = config.media_file(ad["raw_path"])
     if not src.exists():
         raise media.MediaError(f"original missing: {src}")
 
@@ -132,7 +131,7 @@ def process(conn, job: dict) -> None:
     conn.execute(
         "UPDATE ads SET status='ready', media_path=?, thumb_path=?, width=?, "
         "height=?, error=NULL WHERE id=?",
-        (str(result.media_path), str(result.thumb_path),
+        (config.stored_path(result.media_path), config.stored_path(result.thumb_path),
          result.width, result.height, ad["id"]),
     )
     conn.execute(
@@ -178,6 +177,8 @@ def main() -> int:
             logging.StreamHandler(sys.stdout),
         ],
     )
+    for warning in config.unknown_settings():
+        log.warning(warning)
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 

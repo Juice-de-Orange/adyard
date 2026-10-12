@@ -327,3 +327,14 @@ def test_sigterm_ends_the_wait_immediately(app_env, tmp_path, monkeypatch):
 
     assert duration < 3, f"SIGTERM did not wake select() (waited {duration:.1f}s)"
     assert worker._running is False, "the stop request was not recorded"
+
+
+def test_a_cached_snippet_gives_the_space_back_once_the_banner_is_gone(admin_client, app_env):
+    """The snippet may be cached for five minutes; a paused or deleted banner's media
+    answers 404 meanwhile. The snippet must then remove its box, not leave it empty."""
+    slug = _ready_ad(admin_client, app_env, title="Cached")
+    js = admin_client.get(f"/embed/{slug}.js").text
+    assert 'el.addEventListener("error"' in js
+    assert "box.parentNode.removeChild(box)" in js
+    admin_client.post(f"/ads/{slug}/toggle")
+    assert admin_client.get(f"/m/{slug}").status_code == 404

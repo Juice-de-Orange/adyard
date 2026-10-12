@@ -4,7 +4,9 @@
 services:
   web:
     build: .
-    image: maxads:local
+    # Named after the Compose project, so two checkouts on one host do not
+    # overwrite each other's image (`-p` or the directory name sets it).
+    image: ${COMPOSE_PROJECT_NAME:-maxads}-app
     env_file: .env
     ports:
       - "${MAXADS_PORT:-8080}:8080"
@@ -19,7 +21,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: maxads:local
+    image: ${COMPOSE_PROJECT_NAME:-maxads}-app
     command: ["python", "-m", "app.worker"]
     env_file: .env
     depends_on:

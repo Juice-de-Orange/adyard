@@ -139,7 +139,7 @@ def test_image_upload_creates_job(admin_client, app_env):
     assert ad["kind"] == "image"
     assert ad["status"] == "processing"
     assert job["ad_id"] == ad["id"] and job["state"] == "pending"
-    assert Path(ad["raw_path"]).exists(), "original must be kept in data/raw"
+    assert (Path(app_env) / ad["raw_path"]).exists(), "original must be kept in data/raw"
 
 
 def test_rejects_unsupported_type(admin_client):
@@ -166,7 +166,7 @@ def test_embed_snippet_is_javascript_and_open_to_any_origin(admin_client, app_en
 
     assert ad["status"] == "ready"
     assert ad["media_path"].endswith(".webp")
-    assert Path(ad["media_path"]).exists()
+    assert (Path(app_env) / ad["media_path"]).exists()
 
     r = admin_client.get(f"/embed/{ad['slug']}.js")
     assert r.status_code == 200
@@ -330,10 +330,12 @@ def test_a_title_cannot_break_out_of_the_delete_confirmation(admin_client, app_e
                           files={"file": ("x.png", fh, "image/png")})
 
     page = admin_client.get("/").text
-    handler = page.split('onsubmit="', 1)[1].split('"', 1)[0]
-    assert "__xss" not in handler
-    assert "this.dataset.title" in handler
-    assert 'data-title="y&#39;+(window.__xss=1)+&#39;"' in page
+    assert "onsubmit=" not in page, "no inline handler that a title could break out of"
+    assert 'data-confirm="Really bin the banner “y&#39;+(window.__xss=1)+&#39;”?"' in page
+    # The message is only ever handed to confirm() as text.
+    js = admin_client.get("/static/dashboard.js").text
+    assert "window.confirm(form.dataset.confirm)" in js
+    assert "innerHTML" not in js and "eval(" not in js
 
 
 def test_a_click_on_an_ad_without_a_target_is_not_counted(admin_client, app_env):
@@ -371,3 +373,19 @@ def test_form_errors_come_back_on_the_dashboard(admin_client):
     admin_client.post("/users", data={"username": "dup", "password": "long enough pw"})
     r = admin_client.post("/users", data={"username": "dup", "password": "long enough pw"})
     assert r.status_code == 409 and "already taken" in r.text
+
+
+def test_unknown_settings_are_reported_with_the_closest_name(app_env, monkeypatch, caplog):
+    """A typo in a variable name is otherwise silent: the default stays in place."""
+    import logging
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("MAXADS_TRUSTED_PROXIE", "10.0.0.0/8")
+    monkeypatch.setenv("MAXADS_SOMETHING_ELSE", "1")
+    from app.main import create_app
+
+    with caplog.at_level(logging.WARNING):
+        TestClient(create_app())
+    assert ("unknown setting MAXADS_TRUSTED_PROXIE is ignored -- "
+            "did you mean MAXADS_TRUSTED_PROXIES?") in caplog.text
+    assert "unknown setting MAXADS_SOMETHING_ELSE is ignored" in caplog.text
+    assert "MAXADS_PUBLIC_URL" not in caplog.text, "known settings are not reported"

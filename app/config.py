@@ -1,4 +1,6 @@
 """Central configuration. Everything is path-based and overridable via environment."""
+import difflib
+import ipaddress
 import logging
 import os
 import secrets
@@ -38,6 +40,13 @@ SECRET_KEY = os.environ.get("MAXADS_SECRET_KEY", "")
 # Mixed into the daily visitor hash so we never store raw IPs.
 COUNT_SALT = os.environ.get("MAXADS_COUNT_SALT", "")
 
+# Reverse proxies whose X-Forwarded-For / X-Forwarded-Proto headers are believed:
+# comma-separated addresses or networks. From any other peer the headers are
+# ignored -- otherwise every client could pick its own address and inflate the
+# impressions past the per-day deduplication. The default trusts a proxy on the
+# same machine only; an empty value trusts nobody.
+TRUSTED_PROXIES = os.environ.get("MAXADS_TRUSTED_PROXIES", "127.0.0.1,::1")
+
 # Password for the first admin account. If unset, one is generated on first
 # start and printed once to stderr -- never written to the log files.
 ADMIN_PASSWORD = os.environ.get("MAXADS_ADMIN_PASSWORD", "")
@@ -64,6 +73,67 @@ def require_mount() -> None:
             f"Refusing to start: {SENTINEL} is missing. "
             "The data disk is not mounted (or set MAXADS_REQUIRE_MOUNT=0)."
         )
+
+
+# Every MAXADS_ variable that the service or docker-compose.yml reads.
+KNOWN_SETTINGS = (
+    "MAXADS_BASE", "MAXADS_REQUIRE_MOUNT", "MAXADS_PUBLIC_URL", "MAXADS_PORT",
+    "MAXADS_SECRET_KEY", "MAXADS_COUNT_SALT", "MAXADS_ADMIN_PASSWORD",
+    "MAXADS_MAX_UPLOAD_MB", "MAXADS_TRUSTED_PROXIES",
+)
+
+
+def unknown_settings() -> list[str]:
+    """Warnings for MAXADS_ variables nobody reads.
+
+    Almost always a typo, and a typo is silent: the default stays in place and
+    the service runs as if the line were not there.
+    """
+    warnings = []
+    for name in sorted(os.environ):
+        if not name.startswith("MAXADS_") or name in KNOWN_SETTINGS:
+            continue
+        close = difflib.get_close_matches(name, KNOWN_SETTINGS, n=1)
+        hint = f" -- did you mean {close[0]}?" if close else ""
+        warnings.append(f"unknown setting {name} is ignored{hint}")
+    return warnings
+
+
+def trusted_proxies() -> list[str]:
+    """MAXADS_TRUSTED_PROXIES as a list, refusing to start on anything malformed.
+
+    uvicorn would quietly treat a typo as a literal host name that never matches,
+    so a mistake here would look like a working setup that counts wrong.
+    """
+    entries = [e.strip() for e in TRUSTED_PROXIES.split(",") if e.strip()]
+    for entry in entries:
+        try:
+            ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            raise SystemExit(
+                f"MAXADS_TRUSTED_PROXIES: {entry!r} is not an IP address or network "
+                "(expected e.g. 127.0.0.1,10.0.0.0/8)."
+            ) from None
+    return entries
+
+
+def stored_path(path: Path) -> str:
+    """A file under BASE_DIR as the database keeps it: relative to BASE_DIR.
+
+    Relative so that the data directory can move -- another disk, a container
+    volume, a restore on a new host -- without breaking a single banner.
+    """
+    return Path(path).relative_to(BASE_DIR).as_posix()
+
+
+def media_file(stored: str) -> Path:
+    """The file behind a path from the database.
+
+    An absolute path is one from before v0.2 that lies outside BASE_DIR, so the
+    start-up conversion (db.relativize_media_paths) left it as it was.
+    """
+    path = Path(stored)
+    return path if path.is_absolute() else BASE_DIR / path
 
 
 def ensure_dirs() -> None:

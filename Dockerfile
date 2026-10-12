@@ -25,5 +25,7 @@ ENV MAXADS_BASE=/data \
 
 USER maxads
 EXPOSE 8080
+# --no-proxy-headers: whose X-Forwarded-For is believed is decided by the app
+# alone (MAXADS_TRUSTED_PROXIES), not by a second, differently configured layer.
 CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8080", \
-     "--no-access-log", "--timeout-keep-alive", "15"]
+     "--no-proxy-headers", "--no-access-log", "--timeout-keep-alive", "15"]
