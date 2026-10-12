@@ -5,6 +5,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- `X-Forwarded-For` is believed only from the reverse proxies listed in the new
+  setting `MAXADS_TRUSTED_PROXIES` (default `127.0.0.1,::1`). Before, any client
+  could send a different address with every request and inflate impressions and
+  clicks past the per-day deduplication (#2). Behind a proxy that is not on the
+  same machine (for example a proxy container in front of the Docker setup), set
+  this to the proxy's address or network. The Docker image and the systemd unit
+  now start uvicorn with `--no-proxy-headers`, so the setting is the only place
+  that decides.
+
 ## [0.1.0] - 2026-10-06
 
 ### Added

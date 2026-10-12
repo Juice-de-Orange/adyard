@@ -1,4 +1,5 @@
 """Central configuration. Everything is path-based and overridable via environment."""
+import ipaddress
 import logging
 import os
 import secrets
@@ -38,6 +39,13 @@ SECRET_KEY = os.environ.get("MAXADS_SECRET_KEY", "")
 # Mixed into the daily visitor hash so we never store raw IPs.
 COUNT_SALT = os.environ.get("MAXADS_COUNT_SALT", "")
 
+# Reverse proxies whose X-Forwarded-For / X-Forwarded-Proto headers are believed:
+# comma-separated addresses or networks. From any other peer the headers are
+# ignored -- otherwise every client could pick its own address and inflate the
+# impressions past the per-day deduplication. The default trusts a proxy on the
+# same machine only; an empty value trusts nobody.
+TRUSTED_PROXIES = os.environ.get("MAXADS_TRUSTED_PROXIES", "127.0.0.1,::1")
+
 # Password for the first admin account. If unset, one is generated on first
 # start and printed once to stderr -- never written to the log files.
 ADMIN_PASSWORD = os.environ.get("MAXADS_ADMIN_PASSWORD", "")
@@ -64,6 +72,24 @@ def require_mount() -> None:
             f"Refusing to start: {SENTINEL} is missing. "
             "The data disk is not mounted (or set MAXADS_REQUIRE_MOUNT=0)."
         )
+
+
+def trusted_proxies() -> list[str]:
+    """MAXADS_TRUSTED_PROXIES as a list, refusing to start on anything malformed.
+
+    uvicorn would quietly treat a typo as a literal host name that never matches,
+    so a mistake here would look like a working setup that counts wrong.
+    """
+    entries = [e.strip() for e in TRUSTED_PROXIES.split(",") if e.strip()]
+    for entry in entries:
+        try:
+            ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            raise SystemExit(
+                f"MAXADS_TRUSTED_PROXIES: {entry!r} is not an IP address or network "
+                "(expected e.g. 127.0.0.1,10.0.0.0/8)."
+            ) from None
+    return entries
 
 
 def ensure_dirs() -> None:

@@ -15,6 +15,7 @@ from fastapi.responses import (
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from . import auth, config, db, media, stats
 
@@ -28,6 +29,7 @@ SLUG_RE = re.compile(r"^[a-z0-9]{12}$")
 
 def create_app() -> FastAPI:
     config.require_mount()
+    proxies = config.trusted_proxies()
     config.ensure_dirs()
     logging.basicConfig(
         level=logging.INFO,
@@ -76,6 +78,11 @@ def create_app() -> FastAPI:
         SessionMiddleware, secret_key=secret, same_site="lax", https_only=False,
         session_cookie="maxads_session",
     )
+    # Added last, so it runs first: everything after it sees the real client in
+    # request.client. The Docker image and the systemd unit start uvicorn with
+    # --no-proxy-headers, so this is the only place that decides.
+    application.add_middleware(ProxyHeadersMiddleware, trusted_hosts=proxies)
+    log.info("X-Forwarded-For is trusted from: %s", ", ".join(proxies) or "nobody")
     register_routes(application)
     return application
 
@@ -131,10 +138,9 @@ def wake_worker() -> None:
 
 
 def client_ip(request: Request) -> str:
-    """Real client IP when running behind a reverse proxy."""
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """The client address. Behind a trusted proxy (MAXADS_TRUSTED_PROXIES) the
+    proxy middleware has already put the forwarded address here; a header from
+    anyone else never gets this far."""
     return request.client.host if request.client else "0.0.0.0"
 
 

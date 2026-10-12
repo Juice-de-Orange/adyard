@@ -56,6 +56,16 @@ For a public setup, put the service behind a reverse proxy with TLS and set
 `MAXADS_PUBLIC_URL` (e.g. `https://ads.example.com`) — the embed snippets point
 there. Running it without Docker: [docs/deploy/systemd.md](docs/deploy/systemd.md).
 
+Visitors are told apart by their address, so MaxAds believes `X-Forwarded-For`
+only from the peers in `MAXADS_TRUSTED_PROXIES` (default `127.0.0.1,::1`: a proxy
+on the same machine, the systemd setup). Reached directly, as in the quick start,
+nothing needs setting — a forged header is ignored. Behind a proxy in front of
+the Docker setup, its connections arrive from a Docker network, so set the
+proxy's container address or that network (e.g. `172.16.0.0/12`, the range Docker
+uses for its bridge networks); otherwise every visitor looks like the proxy and
+is counted once a day. Trust nothing wider than you have to: any peer in the list
+can claim any address.
+
 ## Embedding
 
 ```html

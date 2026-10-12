@@ -28,10 +28,12 @@ EnvironmentFile=-/etc/maxads.env
 ExecStartPre=/usr/bin/test -f /srv/maxads/.mounted
 # --no-access-log: the reverse proxy already logs every request. A second line
 # per banner request only costs writes and says nothing new.
-# ADJUST: the venv path; --host, --port and --forwarded-allow-ips if the reverse
-# proxy runs on another machine.
+# --no-proxy-headers: which proxy may set X-Forwarded-For is decided by the app
+# (MAXADS_TRUSTED_PROXIES in the environment file, default 127.0.0.1 and ::1).
+# ADJUST: the venv path; --host and --port if the reverse proxy runs on another
+# machine (then also MAXADS_TRUSTED_PROXIES).
 ExecStart=/opt/maxads/venv/bin/uvicorn app.main:create_app --factory \
-          --host 127.0.0.1 --port 8080 --proxy-headers --forwarded-allow-ips='127.0.0.1' \
+          --host 127.0.0.1 --port 8080 --no-proxy-headers \
           --no-access-log --timeout-keep-alive 15
 Restart=on-failure
 RestartSec=5

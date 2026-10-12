@@ -39,9 +39,18 @@ The generated first-admin password is in the journal once:
 
 ## Reverse proxy
 
-The web unit listens on `127.0.0.1:8080` and trusts `X-Forwarded-*` headers only
-from `127.0.0.1`. If your proxy runs on another machine, change `--host` and
-`--forwarded-allow-ips` in `maxads.service` to match. Example for Caddy:
+The web unit listens on `127.0.0.1:8080`. MaxAds tells visitors apart by their
+address, so it must know which peer may report the real one in
+`X-Forwarded-For`: `MAXADS_TRUSTED_PROXIES` in `/etc/maxads.env`, default
+`127.0.0.1,::1` — right for a proxy on the same machine. From every other peer
+the header is ignored, so nobody can inflate the impressions by sending a new
+address with each request.
+
+If your proxy runs on another machine, change `--host` in `maxads.service` and
+set `MAXADS_TRUSTED_PROXIES` to the proxy's address (e.g. `192.0.2.10`). Units
+from v0.1.0 that still pass `--proxy-headers --forwarded-allow-ips=…` keep
+working, but replace those two options with `--no-proxy-headers` so the
+environment file is the only place that decides. Example for Caddy:
 
 ```
 ads.example.com {
