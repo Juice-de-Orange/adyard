@@ -16,6 +16,14 @@ All notable changes to this project are documented here. The format follows
   now start uvicorn with `--no-proxy-headers`, so the setting is the only place
   that decides.
 
+### Fixed
+
+- Moving the data directory (`MAXADS_BASE`) no longer breaks every banner: media
+  paths are stored relative to it. Paths that v0.1 stored absolute are converted
+  on the first start of this version, as long as they lie under the configured
+  data directory; anything else is left as it is and logged. So update first,
+  then move the directory.
+
 ### Added
 
 - Web service and worker warn at start about `MAXADS_` variables they do not

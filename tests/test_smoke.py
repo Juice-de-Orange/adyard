@@ -139,7 +139,7 @@ def test_image_upload_creates_job(admin_client, app_env):
     assert ad["kind"] == "image"
     assert ad["status"] == "processing"
     assert job["ad_id"] == ad["id"] and job["state"] == "pending"
-    assert Path(ad["raw_path"]).exists(), "original must be kept in data/raw"
+    assert (Path(app_env) / ad["raw_path"]).exists(), "original must be kept in data/raw"
 
 
 def test_rejects_unsupported_type(admin_client):
@@ -166,7 +166,7 @@ def test_embed_snippet_is_javascript_and_open_to_any_origin(admin_client, app_en
 
     assert ad["status"] == "ready"
     assert ad["media_path"].endswith(".webp")
-    assert Path(ad["media_path"]).exists()
+    assert (Path(app_env) / ad["media_path"]).exists()
 
     r = admin_client.get(f"/embed/{ad['slug']}.js")
     assert r.status_code == 200

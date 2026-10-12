@@ -316,7 +316,7 @@ def register_routes(app: FastAPI) -> None:
                 "INSERT INTO ads(slug, title, target_url, kind, raw_path, created_by) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 (slug, title.strip() or slug, target_url.strip(), kind,
-                 str(raw_path), user["id"]),
+                 config.stored_path(raw_path), user["id"]),
             )
             conn.execute("INSERT INTO jobs(ad_id) VALUES (?)", (cur.lastrowid,))
         wake_worker()
@@ -337,7 +337,7 @@ def register_routes(app: FastAPI) -> None:
                 raise HTTPException(404)
             for key in ("raw_path", "media_path", "thumb_path"):
                 if ad[key]:
-                    Path(ad[key]).unlink(missing_ok=True)
+                    config.media_file(ad[key]).unlink(missing_ok=True)
             conn.execute("DELETE FROM ads WHERE id = ?", (ad["id"],))
         log.info("ad %s deleted by %s", slug, user["username"])
         return RedirectResponse("/", status_code=303)
@@ -365,7 +365,7 @@ def register_routes(app: FastAPI) -> None:
             ad = ad_by_slug(conn, slug)
             if ad is None:
                 raise HTTPException(404)
-            path = Path(ad["thumb_path"] if thumb else ad["media_path"])
+            path = config.media_file(ad["thumb_path"] if thumb else ad["media_path"])
         if not path.exists():
             raise HTTPException(404)
         media_type = "image/webp" if path.suffix == ".webp" else "video/mp4"
@@ -488,9 +488,9 @@ def register_routes(app: FastAPI) -> None:
             if ad is None:
                 raise HTTPException(404)
             record_event(request, conn, ad["id"], "impression")
-            path = Path(ad["media_path"])
+            path = config.media_file(ad["media_path"])
             kind = ad["kind"]
-            thumb = Path(ad["thumb_path"]) if ad["thumb_path"] else None
+            thumb = config.media_file(ad["thumb_path"]) if ad["thumb_path"] else None
         # A video cannot be shown in an <img>; its thumbnail can.
         served = path if kind == "image" else (thumb or path)
         if not served.exists():

@@ -117,6 +117,25 @@ def trusted_proxies() -> list[str]:
     return entries
 
 
+def stored_path(path: Path) -> str:
+    """A file under BASE_DIR as the database keeps it: relative to BASE_DIR.
+
+    Relative so that the data directory can move -- another disk, a container
+    volume, a restore on a new host -- without breaking a single banner.
+    """
+    return Path(path).relative_to(BASE_DIR).as_posix()
+
+
+def media_file(stored: str) -> Path:
+    """The file behind a path from the database.
+
+    An absolute path is one from before v0.2 that lies outside BASE_DIR, so the
+    start-up conversion (db.relativize_media_paths) left it as it was.
+    """
+    path = Path(stored)
+    return path if path.is_absolute() else BASE_DIR / path
+
+
 def ensure_dirs() -> None:
     for path in (RAW_DIR, MEDIA_DIR, DB_DIR, LOG_DIR):
         path.mkdir(parents=True, exist_ok=True)

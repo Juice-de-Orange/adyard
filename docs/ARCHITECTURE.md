@@ -128,6 +128,12 @@ by one, each in a transaction.
 > no-op and makes a half-applied migration impossible to roll back. Hence
 > `split_statements()`.
 
+File paths in `ads` (`raw_path`, `media_path`, `thumb_path`) are relative to
+`$MAXADS_BASE`, so the data directory can move — another disk, a container
+volume, a restore on a new host. v0.1 stored them absolute; every start converts
+the ones under the current data directory (`relativize_media_paths()`, idempotent)
+and logs, without touching, any that lie elsewhere.
+
 | Table | Purpose |
 |---|---|
 | `users` | login; every user has full rights |
