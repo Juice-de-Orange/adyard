@@ -36,6 +36,10 @@ All notable changes to this project are documented here. The format follows
   secrets, safe while the service runs; `python -m app.restore <file>` (or `-`)
   checks it and puts it back, moving the current data aside instead of deleting
   it. README and the systemd guide describe backup, restore and update (#4).
+- Accounts can be removed from the dashboard (✕ next to the name, with a
+  confirmation). Their banners stay on air and, like the accounts they created,
+  move to whoever removed them. Nobody can remove their own account or the last
+  one (#3).
 
 - Web service and worker warn at start about `MAXADS_` variables they do not
   know, with the closest known name (a typo used to leave the default in place

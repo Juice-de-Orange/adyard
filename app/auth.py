@@ -46,6 +46,38 @@ def set_password(conn: sqlite3.Connection, user_id: int, password: str) -> None:
     )
 
 
+class AccountError(ValueError):
+    """An account change the rules do not allow; the message is for the user."""
+
+
+def delete_user(conn: sqlite3.Connection, user_id: int, acting_id: int) -> tuple[str, int]:
+    """Remove an account. Returns (username, number of banners handed over).
+
+    Its banners keep running and, like the accounts it created, move to
+    `acting_id` -- both columns reference users(id), so they could not point at
+    a deleted row anyway. Nobody removes themselves, and the last account
+    stays: without it, nobody could log in again.
+    """
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        row = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row is None:
+            raise LookupError(user_id)
+        if user_id == acting_id:
+            raise AccountError("You cannot remove your own account.")
+        if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] <= 1:
+            raise AccountError("The last account cannot be removed.")
+        moved = conn.execute("UPDATE ads SET created_by = ? WHERE created_by = ?",
+                             (acting_id, user_id)).rowcount
+        conn.execute("UPDATE users SET created_by = ? WHERE created_by = ?", (acting_id, user_id))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    return row["username"], moved
+
+
 def authenticate(conn: sqlite3.Connection, username: str, password: str) -> sqlite3.Row | None:
     row = conn.execute(
         "SELECT * FROM users WHERE username = ?", (username.strip(),)

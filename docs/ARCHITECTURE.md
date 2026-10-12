@@ -153,5 +153,7 @@ and logs, without touching, any that lie elsewhere.
 - **No public registration.** The first admin is created at start-up, further
   accounts only from the dashboard.
 - **No roles.** Every account can do everything — it is a tool for a small team.
-- **No user deletion** in the interface. On the database it works; `ads.created_by`
-  has to be reassigned first, or the foreign key blocks it.
+- **No account removes itself, and the last account stays.** Removing an account
+  (✕ in "The ad crew") hands its banners — which keep running — and the accounts
+  it created to whoever removes it; `ads.created_by` and `users.created_by` both
+  reference `users(id)`.

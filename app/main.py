@@ -392,6 +392,18 @@ def register_routes(app: FastAPI) -> None:
         log.info("user %r created by %s", username, user["username"])
         return RedirectResponse("/", status_code=303)
 
+    @app.post("/users/{user_id}/delete")
+    def remove_user(request: Request, user_id: int, user: dict = Depends(require_user)):
+        with db.session() as conn:
+            try:
+                username, moved = auth.delete_user(conn, user_id, acting_id=user["id"])
+            except LookupError:
+                return render_dashboard(request, user, "That account does not exist (any more).", 404)
+            except auth.AccountError as exc:
+                return render_dashboard(request, user, str(exc), 400)
+        log.info("user %r removed by %s, %d banner(s) handed over", username, user["username"], moved)
+        return RedirectResponse("/", status_code=303)
+
     # ---------------- public delivery ----------------
 
     @app.get("/m/{slug}")

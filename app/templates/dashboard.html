@@ -271,10 +271,19 @@
   <!-- ══ Team ════════════════════════════════════════════════════ -->
   <section class="card p-5">
     <h2 class="text-xl font-black mb-1">🧑‍🤝‍🧑 The ad crew</h2>
-    <p class="text-sm font-semibold mb-3" style="color:var(--ink-soft)">Every member can do everything. Trust is a beautiful thing.</p>
+    <p class="text-sm font-semibold mb-3" style="color:var(--ink-soft)">Every member can do everything. Trust is a beautiful thing.
+      Someone leaving? ✕ removes them, and their banners stay on air under your name.</p>
     <ul class="flex flex-wrap gap-2 mb-4">
       {% for u in users %}
-      <li class="badge text-sm" style="background:var(--sun)">{{ u.username }}</li>
+      <li class="badge text-sm inline-flex items-center gap-2" style="background:var(--sun)">{{ u.username }}
+        {% if u.id != user.id %}
+        <form method="post" action="/users/{{ u.id }}/delete" class="inline-flex"
+              data-confirm="Remove {{ u.username }} from the crew? Their banners stay and move to you.">
+          <button class="leading-none font-black" title="Remove {{ u.username }}"
+                  aria-label="Remove {{ u.username }}">✕</button>
+        </form>
+        {% endif %}
+      </li>
       {% endfor %}
     </ul>
     <form method="post" action="/users" class="grid sm:grid-cols-3 gap-3 items-end">
