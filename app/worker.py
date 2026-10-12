@@ -178,6 +178,8 @@ def main() -> int:
             logging.StreamHandler(sys.stdout),
         ],
     )
+    for warning in config.unknown_settings():
+        log.warning(warning)
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 

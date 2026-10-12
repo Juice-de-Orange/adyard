@@ -371,3 +371,19 @@ def test_form_errors_come_back_on_the_dashboard(admin_client):
     admin_client.post("/users", data={"username": "dup", "password": "long enough pw"})
     r = admin_client.post("/users", data={"username": "dup", "password": "long enough pw"})
     assert r.status_code == 409 and "already taken" in r.text
+
+
+def test_unknown_settings_are_reported_with_the_closest_name(app_env, monkeypatch, caplog):
+    """A typo in a variable name is otherwise silent: the default stays in place."""
+    import logging
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("MAXADS_TRUSTED_PROXIE", "10.0.0.0/8")
+    monkeypatch.setenv("MAXADS_SOMETHING_ELSE", "1")
+    from app.main import create_app
+
+    with caplog.at_level(logging.WARNING):
+        TestClient(create_app())
+    assert ("unknown setting MAXADS_TRUSTED_PROXIE is ignored -- "
+            "did you mean MAXADS_TRUSTED_PROXIES?") in caplog.text
+    assert "unknown setting MAXADS_SOMETHING_ELSE is ignored" in caplog.text
+    assert "MAXADS_PUBLIC_URL" not in caplog.text, "known settings are not reported"

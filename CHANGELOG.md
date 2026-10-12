@@ -16,6 +16,12 @@ All notable changes to this project are documented here. The format follows
   now start uvicorn with `--no-proxy-headers`, so the setting is the only place
   that decides.
 
+### Added
+
+- Web service and worker warn at start about `MAXADS_` variables they do not
+  know, with the closest known name (a typo used to leave the default in place
+  without a word).
+
 ## [0.1.0] - 2026-10-06
 
 ### Added

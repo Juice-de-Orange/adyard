@@ -1,4 +1,5 @@
 """Central configuration. Everything is path-based and overridable via environment."""
+import difflib
 import ipaddress
 import logging
 import os
@@ -72,6 +73,30 @@ def require_mount() -> None:
             f"Refusing to start: {SENTINEL} is missing. "
             "The data disk is not mounted (or set MAXADS_REQUIRE_MOUNT=0)."
         )
+
+
+# Every MAXADS_ variable that the service or docker-compose.yml reads.
+KNOWN_SETTINGS = (
+    "MAXADS_BASE", "MAXADS_REQUIRE_MOUNT", "MAXADS_PUBLIC_URL", "MAXADS_PORT",
+    "MAXADS_SECRET_KEY", "MAXADS_COUNT_SALT", "MAXADS_ADMIN_PASSWORD",
+    "MAXADS_MAX_UPLOAD_MB", "MAXADS_TRUSTED_PROXIES",
+)
+
+
+def unknown_settings() -> list[str]:
+    """Warnings for MAXADS_ variables nobody reads.
+
+    Almost always a typo, and a typo is silent: the default stays in place and
+    the service runs as if the line were not there.
+    """
+    warnings = []
+    for name in sorted(os.environ):
+        if not name.startswith("MAXADS_") or name in KNOWN_SETTINGS:
+            continue
+        close = difflib.get_close_matches(name, KNOWN_SETTINGS, n=1)
+        hint = f" -- did you mean {close[0]}?" if close else ""
+        warnings.append(f"unknown setting {name} is ignored{hint}")
+    return warnings
 
 
 def trusted_proxies() -> list[str]:

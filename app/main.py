@@ -40,6 +40,9 @@ def create_app() -> FastAPI:
         ],
     )
 
+    for warning in config.unknown_settings():
+        log.warning(warning)
+
     db.migrate()
     secret = config.SECRET_KEY or config.load_or_create_secret(
         "MAXADS_SECRET_KEY", config.BASE_DIR / ".secret_key"
