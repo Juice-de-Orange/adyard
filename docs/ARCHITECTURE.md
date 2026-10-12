@@ -65,6 +65,21 @@ Telling visitors apart needs no more than a hash of IP, user agent, **the date**
 and a secret. The next day the same visitor cannot be recognised. The numbers
 stay useful without the service becoming a visitor log.
 
+## Why the login throttle counts twice, and only in memory
+
+Password guessing is slowed per client address *and* per account name: one
+address trying many names hits the first, many addresses trying one account
+(easy behind a proxy that forwards whatever address it is given) hit the
+second. After five failures a key is locked for 30 s, each further failure
+doubles that up to 15 minutes, and while locked not even the right password is
+checked — a lock that still answered "right" or "wrong" would not stop anything.
+A successful login clears both keys.
+
+The counters are in memory (`app/ratelimit.py`), bounded in size and forgotten
+after a day without failures. MaxAds runs one web process, so that is exact;
+it also means the client addresses involved never reach the database or a log
+file. A restart forgets them.
+
 ## Why browser compatibility beats file size
 
 Video processing never delivers more bytes than were uploaded — **unless** the

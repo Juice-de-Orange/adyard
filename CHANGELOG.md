@@ -15,6 +15,11 @@ All notable changes to this project are documented here. The format follows
   this to the proxy's address or network. The Docker image and the systemd unit
   now start uvicorn with `--no-proxy-headers`, so the setting is the only place
   that decides.
+- Password guessing on the dashboard login is slowed down: after five failed
+  logins from one client address or for one account name, further attempts are
+  answered with `429 Too Many Requests` and `Retry-After` for 30 seconds,
+  doubling with every further failure up to 15 minutes; a successful login
+  clears the count. The counters are kept in memory only.
 - The dashboard no longer loads Tailwind's Play CDN script from a third party:
   the stylesheet is prebuilt into `app/static/` (`scripts/build-css.sh`), the
   page behaviour moved from inline handlers to `app/static/dashboard.js`, and

@@ -224,10 +224,11 @@ other than Chromium.
 
 ### Known limitations
 
-- **No limit on login attempts.** A wrong password costs an argon2 check, but
-  nothing slows down repeated guessing. Use long passwords, and rate-limit
-  `POST /login` in your reverse proxy if the dashboard is reachable from the
-  internet.
+- **The login throttle counts in memory.** After five failed logins from one
+  address or for one account name, further attempts get `429` for 30 seconds,
+  doubling with every further failure (up to 15 minutes). The counters live in
+  the single web process: a restart forgets them, and someone guessing can also
+  lock the real owner of that account name out for that time.
 - **No roles.** Every account can do everything, including removing other
   accounts.
 - **Browser caches.** A visitor's browser keeps a delivered banner for up to a

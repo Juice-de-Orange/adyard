@@ -20,6 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from . import auth, config, db, media, stats
+from .ratelimit import LoginThrottle
 
 log = logging.getLogger("maxads.web")
 
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
 
     application = FastAPI(title="MaxAds", docs_url=None, redoc_url=None)
     application.state.count_salt = count_salt
+    application.state.login_throttle = LoginThrottle()
 
     # Ads are embedded on foreign sites, so delivery must be open to any origin.
     application.add_middleware(
@@ -249,9 +251,22 @@ def register_routes(app: FastAPI) -> None:
 
     @app.post("/login")
     def login(request: Request, username: str = Form(...), password: str = Form(...)):
+        throttle = request.app.state.login_throttle
+        address = client_ip(request)
+        wait = throttle.retry_after(address, username)
+        if wait:
+            # The password is not even checked: a lock that still answered
+            # "right" or "wrong" would let the guessing go on.
+            log.warning("login for %r refused for %ds after repeated failures", username, wait)
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"error": f"Too many failed logins. Try again in {wait} seconds."},
+                status_code=429, headers={"Retry-After": str(wait)},
+            )
         with db.session() as conn:
             user = auth.authenticate(conn, username, password)
         if user is None:
+            throttle.failure(address, username)
             # Without the client address on purpose: the log files are storage
             # too, and the service promises not to keep IP addresses.
             log.warning("failed login for %r", username)
@@ -259,6 +274,7 @@ def register_routes(app: FastAPI) -> None:
                 request, "login.html", {"error": "Wrong username or password."},
                 status_code=401,
             )
+        throttle.success(address, username)
         request.session["uid"] = user["id"]
         if user["must_change_password"]:
             return RedirectResponse("/password", status_code=303)
