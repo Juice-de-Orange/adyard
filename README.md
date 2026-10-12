@@ -180,7 +180,7 @@ On the original deployment, idle for 60 s:
 ## Tech stack
 
 Python 3.13 · FastAPI · Jinja2 · SQLite · Pillow · ffmpeg · argon2 · Docker /
-systemd · Tailwind (Play CDN, see the open issue).
+systemd · Tailwind CSS (prebuilt into `app/static/`, nothing loaded from a CDN).
 
 ## Development
 
@@ -201,6 +201,10 @@ export MAXADS_PUBLIC_URL=http://localhost:8000
 uvicorn app.main:create_app --factory --reload &
 python -m app.worker
 ```
+
+Changed CSS classes in a template? Rebuild the stylesheet with
+`sh scripts/build-css.sh` (downloads the pinned standalone Tailwind CLI once, no
+Node.js needed) and commit `app/static/tailwind.css`; CI checks that it matches.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and the pre-commit secret
 guard.

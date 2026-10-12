@@ -15,6 +15,11 @@ All notable changes to this project are documented here. The format follows
   this to the proxy's address or network. The Docker image and the systemd unit
   now start uvicorn with `--no-proxy-headers`, so the setting is the only place
   that decides.
+- The dashboard no longer loads Tailwind's Play CDN script from a third party:
+  the stylesheet is prebuilt into `app/static/` (`scripts/build-css.sh`), the
+  page behaviour moved from inline handlers to `app/static/dashboard.js`, and
+  dashboard pages send a Content-Security-Policy that allows script only from
+  the service itself (#1).
 
 ### Fixed
 

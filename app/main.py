@@ -12,7 +12,9 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile, 
 from fastapi.responses import (
     FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response,
 )
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -25,6 +27,37 @@ BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 SLUG_RE = re.compile(r"^[a-z0-9]{12}$")
+
+# For the dashboard pages. Script only from our own /static -- no inline script,
+# no third party. Inline styles stay allowed: the templates use style attributes
+# throughout, and a style cannot run code. /frame/ is exempt: it is meant to be
+# embedded on foreign pages and carries its own small beacon script.
+DASHBOARD_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; media-src 'self'; object-src 'none'; base-uri 'none'; "
+    "form-action 'self'; frame-ancestors 'none'"
+)
+
+
+class DashboardCSP:
+    """Adds DASHBOARD_CSP to every HTML response outside /frame/."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http" or scope["path"].startswith("/frame/"):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_csp(message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                if headers.get("content-type", "").startswith("text/html"):
+                    headers.setdefault("Content-Security-Policy", DASHBOARD_CSP)
+            await send(message)
+
+        await self.app(scope, receive, send_with_csp)
 
 
 def create_app() -> FastAPI:
@@ -81,11 +114,13 @@ def create_app() -> FastAPI:
         SessionMiddleware, secret_key=secret, same_site="lax", https_only=False,
         session_cookie="maxads_session",
     )
+    application.add_middleware(DashboardCSP)
     # Added last, so it runs first: everything after it sees the real client in
     # request.client. The Docker image and the systemd unit start uvicorn with
     # --no-proxy-headers, so this is the only place that decides.
     application.add_middleware(ProxyHeadersMiddleware, trusted_hosts=proxies)
     log.info("X-Forwarded-For is trusted from: %s", ", ".join(proxies) or "nobody")
+    application.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
     register_routes(application)
     return application
 

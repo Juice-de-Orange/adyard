@@ -24,6 +24,12 @@ python -m pytest -q
 python -m ruff check .
 ```
 
+The dashboard's CSS is prebuilt in `app/static/tailwind.css`. After changing
+CSS classes in a template, run `sh scripts/build-css.sh` and commit the result;
+CI fails if the file does not match the templates. Dashboard pages run under a
+Content-Security-Policy without inline script: behaviour goes into
+`app/static/dashboard.js`, not into `onclick=` attributes.
+
 Install `ffmpeg` locally: without it the two video tests skip themselves, and CI
 fails on any skipped test.
 

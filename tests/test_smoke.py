@@ -330,10 +330,12 @@ def test_a_title_cannot_break_out_of_the_delete_confirmation(admin_client, app_e
                           files={"file": ("x.png", fh, "image/png")})
 
     page = admin_client.get("/").text
-    handler = page.split('onsubmit="', 1)[1].split('"', 1)[0]
-    assert "__xss" not in handler
-    assert "this.dataset.title" in handler
-    assert 'data-title="y&#39;+(window.__xss=1)+&#39;"' in page
+    assert "onsubmit=" not in page, "no inline handler that a title could break out of"
+    assert 'data-confirm="Really bin the banner “y&#39;+(window.__xss=1)+&#39;”?"' in page
+    # The message is only ever handed to confirm() as text.
+    js = admin_client.get("/static/dashboard.js").text
+    assert "window.confirm(form.dataset.confirm)" in js
+    assert "innerHTML" not in js and "eval(" not in js
 
 
 def test_a_click_on_an_ad_without_a_target_is_not_counted(admin_client, app_env):

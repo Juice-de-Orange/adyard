@@ -33,6 +33,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now maxads.service maxads-worker.service
 ```
 
+The dashboard stylesheet comes prebuilt with the checkout
+(`app/static/tailwind.css`), so there is nothing to build. Only if you change CSS
+classes in a template, rebuild it with `sh scripts/build-css.sh` (standalone
+Tailwind CLI, pinned and checksum-verified, no Node.js).
+
 The generated first-admin password is in the journal once:
 `journalctl -u maxads | grep "First admin"`. Set `MAXADS_ADMIN_PASSWORD` in
 `/etc/maxads.env` before the first start if you prefer to choose it.

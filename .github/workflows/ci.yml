@@ -31,6 +31,12 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
       - run: pip install -r requirements-dev.txt
       - run: python -m ruff check .
+      # The stylesheet is committed (no build step, no CDN at runtime); it must
+      # match the class names in the templates.
+      - name: Stylesheet matches the templates
+        run: |
+          sh scripts/build-css.sh
+          git diff --exit-code app/static/tailwind.css
       - run: python -m compileall -q app
       - name: Tests (no skips allowed)
         run: |

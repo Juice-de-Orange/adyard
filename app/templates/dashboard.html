@@ -148,9 +148,9 @@
     </p>
     <div class="flex flex-col sm:flex-row gap-2">
       <input readonly value='<script src="{{ public_url }}/embed/random.js" async></script>'
-             class="field mono text-xs flex-1" onclick="this.select()">
+             class="field mono text-xs flex-1" data-select>
       <button type="button" class="btn btn-alt px-4 py-2 text-sm whitespace-nowrap"
-              onclick="navigator.clipboard.writeText(this.previousElementSibling.value);this.textContent='Copied! ✅'">
+              data-copy>
         Copy
       </button>
     </div>
@@ -235,14 +235,14 @@
             {% for name, code in ways %}
             <div>
               <p class="text-xs font-black uppercase tracking-wider mb-1">{{ name }}</p>
-              <input readonly value='{{ code }}' class="field mono text-xs" onclick="this.select()">
+              <input readonly value='{{ code }}' class="field mono text-xs" data-select>
             </div>
             {% endfor %}
             {% if ad.kind == 'image' %}
             <div>
               <p class="text-xs font-black uppercase tracking-wider mb-1">Just an image — no JavaScript at all</p>
               <input readonly value='<a href="{{ public_url }}/c/{{ ad.slug }}"><img src="{{ public_url }}/img/{{ ad.slug }}" alt="{{ ad.title }}" style="max-width:100%;height:auto"></a>'
-                     class="field mono text-xs" onclick="this.select()">
+                     class="field mono text-xs" data-select>
             </div>
             {% endif %}
           </div>
@@ -255,10 +255,11 @@
               {{ '⏸ Pause' if ad.active else '▶ Go' }}
             </button>
           </form>
-          {# The title travels as data, never inside the script text: there HTML escaping
-             would not stop an apostrophe from ending the string. #}
-          <form method="post" action="/ads/{{ ad.slug }}/delete" data-title="{{ ad.title }}"
-                onsubmit="return confirm('Really bin the banner “' + this.dataset.title + '”?')">
+          {# The title travels as data, never inside script text: there HTML escaping
+             would not stop an apostrophe from ending the string. static/dashboard.js
+             shows it with confirm() as plain text. #}
+          <form method="post" action="/ads/{{ ad.slug }}/delete"
+                data-confirm="Really bin the banner “{{ ad.title }}”?">
             <button class="btn px-3 py-1.5 text-sm" style="background:var(--pop);color:#fff">🗑 Delete</button>
           </form>
         </div>
