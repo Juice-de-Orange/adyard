@@ -146,8 +146,10 @@ and logs, without touching, any that lie elsewhere.
 
 ## What is deliberately missing
 
-- **No built-in backup.** Back up the data directory (`$MAXADS_BASE`) with the
-  tool you already use; the SQLite file is safe to copy with `sqlite3 .backup`.
+- **No scheduled backup.** `python -m app.backup` writes one consistent tar
+  (database through SQLite's online backup API, originals, media, generated
+  secrets) and `python -m app.restore` puts it back, moving the current data aside
+  instead of deleting it; when and where to keep backups is up to you.
 - **No public registration.** The first admin is created at start-up, further
   accounts only from the dashboard.
 - **No roles.** Every account can do everything — it is a tool for a small team.

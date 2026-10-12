@@ -26,6 +26,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `python -m app.backup <dir>` (or `-` for stdout) writes one tar with a
+  consistent copy of the database, the originals, the media and the generated
+  secrets, safe while the service runs; `python -m app.restore <file>` (or `-`)
+  checks it and puts it back, moving the current data aside instead of deleting
+  it. README and the systemd guide describe backup, restore and update (#4).
+
 - Web service and worker warn at start about `MAXADS_` variables they do not
   know, with the closest known name (a typo used to leave the default in place
   without a word).

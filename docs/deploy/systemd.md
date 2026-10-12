@@ -60,7 +60,34 @@ ads.example.com {
 
 Set `MAXADS_PUBLIC_URL=https://ads.example.com` in `/etc/maxads.env`.
 
+## Backup and restore
+
+What a backup holds and how a restore treats the existing data is described in
+the [README](../../README.md#backup-restore-and-update). As the service user, from
+the checkout:
+
+```bash
+# Backup -- while the service runs. The tar lands in your own home directory.
+cd /opt/maxads
+sudo -u maxads env MAXADS_BASE=/srv/maxads venv/bin/python -m app.backup - \
+  > ~/maxads-backup-$(date +%Y%m%d-%H%M%S).tar
+
+# Restore -- with both units stopped.
+sudo systemctl stop maxads-worker.service maxads.service
+cd /opt/maxads
+sudo -u maxads env MAXADS_BASE=/srv/maxads venv/bin/python -m app.restore - \
+  < ~/maxads-backup-20261012-120000.tar
+sudo systemctl start maxads.service maxads-worker.service
+```
+
+The previous data ends up in `/srv/maxads/pre-restore-<time>/`; delete it once
+the restored service runs as it should. For a nightly backup, a root cron job or
+timer can run the backup line and rotate the files.
+
 ## Updating
+
+Take a backup first (above; on v0.1.0, which has no backup command, stop both
+units and copy `/srv/maxads` with `cp -a` or `tar`). Then:
 
 ```bash
 cd /opt/maxads && sudo -u maxads git pull
@@ -71,6 +98,11 @@ sudo systemctl restart maxads.service
 sudo systemctl restart maxads-worker.service
 curl -fsS http://127.0.0.1:8080/healthz
 ```
+
+The first start after the update from v0.1.0 converts the media paths stored in
+the database to paths relative to `MAXADS_BASE` (`journalctl -u maxads` shows
+`… media path(s) converted to relative`). Paths outside `MAXADS_BASE` are left
+as they are and logged. Move the data directory only after that first start.
 
 ## When something is stuck
 
