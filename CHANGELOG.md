@@ -28,6 +28,13 @@ All notable changes to this project are documented here. The format follows
   on the first start of this version, as long as they lie under the configured
   data directory; anything else is left as it is and logged. So update first,
   then move the directory.
+- A banner that was paused or deleted no longer leaves an empty box on host
+  pages that still have its embed script cached (up to five minutes): the
+  script removes its box when the media does not load (#11).
+- The Docker image is named after the Compose project (`<project>-app`) instead
+  of the fixed `maxads:local`, so two checkouts on one host no longer overwrite
+  each other's image (#11). The old `maxads:local` image can be removed with
+  `docker image rm maxads:local`.
 
 ### Added
 

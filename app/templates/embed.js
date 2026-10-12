@@ -58,6 +58,14 @@
   box.appendChild(el);
   {% endif %}
 
+  // The snippet may come from a cache for a few minutes after the banner was
+  // paused or deleted; its media then answers 404. Give the space back to the
+  // host page instead of leaving an empty box.
+  el.addEventListener("error", function () {
+    if (io) io.disconnect();
+    if (box.parentNode) box.parentNode.removeChild(box);
+  });
+
   if (script && script.parentNode) {
     script.parentNode.insertBefore(box, script);
   } else {
@@ -79,8 +87,9 @@
     }
   }
 
+  var io = null;
   if ("IntersectionObserver" in window) {
-    var io = new IntersectionObserver(function (entries) {
+    io = new IntersectionObserver(function (entries) {
       for (var i = 0; i < entries.length; i++) {
         if (entries[i].isIntersecting) { count(); io.disconnect(); return; }
       }
