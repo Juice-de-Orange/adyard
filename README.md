@@ -104,7 +104,7 @@ run while web or worker still has the database open.
 ```bash
 git pull
 docker compose up -d --build
-docker compose logs web | tail -n 20
+docker compose logs --tail 20 web worker
 ```
 
 Database changes are applied when the service starts. To pin a release, use
@@ -121,8 +121,9 @@ docker compose stop web worker
 (To go back: check out `v0.1.0`, `docker compose build`, `docker compose stop web worker`,
 then `docker compose run --rm -T --no-deps web tar -C /data -xf - < maxads-v0.1-data.tar`
 and `docker compose up -d`.) The first start of the new version converts the stored media paths to paths
-relative to the data directory and says so in the log (`… media path(s) converted
-to relative`); from then on the data directory can move. Move it only after that
+relative to the data directory and says so in the log of whichever of web and
+worker starts first (`docker compose logs | grep "media path"` shows
+`… media path(s) converted to relative`); from then on the data directory can move. Move it only after that
 first start.
 
 ## Embedding

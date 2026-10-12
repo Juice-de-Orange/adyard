@@ -105,7 +105,8 @@ curl -fsS http://127.0.0.1:8080/healthz
 ```
 
 The first start after the update from v0.1.0 converts the media paths stored in
-the database to paths relative to `MAXADS_BASE` (`journalctl -u maxads` shows
+the database to paths relative to `MAXADS_BASE`
+(`journalctl -u maxads -u maxads-worker | grep "media path"` shows
 `… media path(s) converted to relative`). Paths outside `MAXADS_BASE` are left
 as they are and logged. Move the data directory only after that first start.
 
