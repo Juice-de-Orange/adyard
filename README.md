@@ -220,6 +220,22 @@ delivery, embed on another origin, statistics, pause, delete, restart). Not veri
 the systemd installation from `docs/deploy/`, operation behind a reverse proxy with TLS, and browsers
 other than Chromium.
 
+### Known limitations
+
+- **No limit on login attempts.** A wrong password costs an argon2 check, but
+  nothing slows down repeated guessing. Use long passwords, and rate-limit
+  `POST /login` in your reverse proxy if the dashboard is reachable from the
+  internet.
+- **No roles.** Every account can do everything, including removing other
+  accounts.
+- **Browser caches.** A visitor's browser keeps a delivered banner for up to a
+  day, so a paused or deleted banner can still appear for someone who saw it
+  before; the embed script itself is cached for five minutes.
+- **The generated first password** lives only in the container log (see Quick
+  start).
+- **Not verified on a real host:** the systemd units and the systemd backup and
+  restore commands in `docs/deploy/` (their Python parts were run, systemd was not).
+
 ## Built with Claude Code
 
 This project was written with [Claude Code](https://claude.com/claude-code) as a
