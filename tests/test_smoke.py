@@ -78,7 +78,7 @@ def test_generated_admin_must_change_password_first(client):
 
 
 def test_admin_password_from_the_environment_is_kept(app_env, monkeypatch, capsys):
-    monkeypatch.setenv("MAXADS_ADMIN_PASSWORD", "chosen-by-the-operator")
+    monkeypatch.setenv("ADYARD_ADMIN_PASSWORD", "chosen-by-the-operator")
     from fastapi.testclient import TestClient
     from app.main import create_app
 
@@ -379,13 +379,13 @@ def test_unknown_settings_are_reported_with_the_closest_name(app_env, monkeypatc
     """A typo in a variable name is otherwise silent: the default stays in place."""
     import logging
     from fastapi.testclient import TestClient
-    monkeypatch.setenv("MAXADS_TRUSTED_PROXIE", "10.0.0.0/8")
-    monkeypatch.setenv("MAXADS_SOMETHING_ELSE", "1")
+    monkeypatch.setenv("ADYARD_TRUSTED_PROXIE", "10.0.0.0/8")
+    monkeypatch.setenv("ADYARD_SOMETHING_ELSE", "1")
     from app.main import create_app
 
     with caplog.at_level(logging.WARNING):
         TestClient(create_app())
-    assert ("unknown setting MAXADS_TRUSTED_PROXIE is ignored -- "
-            "did you mean MAXADS_TRUSTED_PROXIES?") in caplog.text
-    assert "unknown setting MAXADS_SOMETHING_ELSE is ignored" in caplog.text
-    assert "MAXADS_PUBLIC_URL" not in caplog.text, "known settings are not reported"
+    assert ("unknown setting ADYARD_TRUSTED_PROXIE is ignored -- "
+            "did you mean ADYARD_TRUSTED_PROXIES?") in caplog.text
+    assert "unknown setting ADYARD_SOMETHING_ELSE is ignored" in caplog.text
+    assert "ADYARD_PUBLIC_URL" not in caplog.text, "known settings are not reported"

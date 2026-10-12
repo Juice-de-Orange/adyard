@@ -8,7 +8,7 @@ lock doubles the wait, up to MAX_LOCK_SECONDS. While a key is locked, no
 password is checked at all, the right one included. A successful login clears
 both keys.
 
-The state lives in memory. That fits how MaxAds runs -- one web process
+The state lives in memory. That fits how Adyard runs -- one web process
 (Docker and the systemd unit start a single uvicorn worker) -- and a restart
 simply forgets it. With several worker processes each would count on its own.
 """

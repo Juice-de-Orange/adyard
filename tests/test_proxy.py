@@ -51,7 +51,7 @@ def test_a_spoofed_forwarded_for_does_not_inflate_clicks(admin_client, make_ad):
 
 
 def test_a_configured_proxy_passes_the_real_client_address(app_env, monkeypatch, make_ad):
-    monkeypatch.setenv("MAXADS_TRUSTED_PROXIES", "10.0.0.0/8, 192.0.2.1")
+    monkeypatch.setenv("ADYARD_TRUSTED_PROXIES", "10.0.0.0/8, 192.0.2.1")
     client = _login(_client("10.1.2.3"))
     slug = make_ad(client)
     for visitor in ("198.51.100.1", "198.51.100.2", "198.51.100.2"):
@@ -60,7 +60,7 @@ def test_a_configured_proxy_passes_the_real_client_address(app_env, monkeypatch,
 
 
 def test_a_peer_outside_the_configured_proxies_is_not_believed(app_env, monkeypatch, make_ad):
-    monkeypatch.setenv("MAXADS_TRUSTED_PROXIES", "10.0.0.0/8")
+    monkeypatch.setenv("ADYARD_TRUSTED_PROXIES", "10.0.0.0/8")
     client = _login(_client("198.51.100.200"))
     slug = make_ad(client)
     for visitor in ("198.51.100.1", "198.51.100.2"):
@@ -78,7 +78,7 @@ def test_the_default_trusts_only_loopback(app_env, make_ad):
 
 
 def test_an_empty_setting_trusts_nobody(app_env, monkeypatch, make_ad):
-    monkeypatch.setenv("MAXADS_TRUSTED_PROXIES", "")
+    monkeypatch.setenv("ADYARD_TRUSTED_PROXIES", "")
     client = _login(_client("127.0.0.1"))
     slug = make_ad(client)
     for visitor in ("198.51.100.1", "198.51.100.2"):
@@ -89,8 +89,8 @@ def test_an_empty_setting_trusts_nobody(app_env, monkeypatch, make_ad):
 @pytest.mark.parametrize("value", ["10.0.0.0/33", "proxy.example.com", "10.0.0.1;10.0.0.2"])
 def test_a_malformed_proxy_entry_refuses_to_start(app_env, monkeypatch, value):
     """A typo must not silently fall back to some other trust setting."""
-    monkeypatch.setenv("MAXADS_TRUSTED_PROXIES", value)
+    monkeypatch.setenv("ADYARD_TRUSTED_PROXIES", value)
     from app.main import create_app
     with pytest.raises(SystemExit) as exc:
         create_app()
-    assert "MAXADS_TRUSTED_PROXIES" in str(exc.value)
+    assert "ADYARD_TRUSTED_PROXIES" in str(exc.value)

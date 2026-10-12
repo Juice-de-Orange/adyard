@@ -1,17 +1,18 @@
 """Restore a backup made by `python -m app.backup` into the data directory.
 
     python -m app.restore <backup.tar>          # or `-` to read the tar from stdin
-    python -m app.restore --force <backup.tar>  # despite a leftover maxads.db-wal
+    python -m app.restore --force <backup.tar>  # despite a leftover adyard.db-wal
 
 Stop web and worker first. Whatever the data directory holds now (database,
 originals, media, generated secrets) is not deleted but moved to
-$MAXADS_BASE/pre-restore-<UTC time>/; remove that folder once the restored
+$ADYARD_BASE/pre-restore-<UTC time>/; remove that folder once the restored
 service runs as it should.
 
 The archive is unpacked and checked in a staging folder first; only a complete,
 intact backup replaces anything. The database moves in without the old -wal and
 -shm files: SQLite would otherwise replay a stale write-ahead log from the old
-database into the restored one.
+database into the restored one. Backups from before the rename to adyard
+("maxads-backup", holding maxads.db) are restored the same way.
 """
 import json
 import os
@@ -23,9 +24,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config, db
-from .backup import FORMAT, MEDIA_DIRS, SECRET_FILES, VERSION, say
+from .backup import (
+    DB_NAME, FORMAT, MEDIA_DIRS, OLD_DB_NAME, OLD_FORMAT, SECRET_FILES, VERSION, say,
+)
 
-TOP_LEVEL = {"MANIFEST.json", "maxads.db", *SECRET_FILES, "data", *MEDIA_DIRS}
+TOP_LEVEL = {"MANIFEST.json", DB_NAME, OLD_DB_NAME, *SECRET_FILES, "data", *MEDIA_DIRS}
 
 
 def _allowed(member: tarfile.TarInfo) -> bool:
@@ -51,24 +54,24 @@ def unpack(source: str, staging: Path) -> None:
         with tar:
             for member in tar:
                 if not _allowed(member):
-                    raise SystemExit(f"Not a MaxAds backup: unexpected entry {member.name!r}")
+                    raise SystemExit(f"Not an Adyard backup: unexpected entry {member.name!r}")
                 tar.extract(member, staging, filter="data")
     except (tarfile.TarError, EOFError) as exc:
         raise SystemExit(f"cannot read the backup (truncated or not a tar file?): {exc}") from None
 
 
 def check(staging: Path) -> dict:
-    """Refuse anything that is not a complete, readable MaxAds backup."""
+    """Refuse anything that is not a complete, readable Adyard backup."""
     try:
         manifest = json.loads((staging / "MANIFEST.json").read_text())
     except (OSError, ValueError):
-        raise SystemExit("Not a MaxAds backup: MANIFEST.json is missing or unreadable") from None
-    if manifest.get("format") != FORMAT or manifest.get("version") != VERSION:
+        raise SystemExit("Not an Adyard backup: MANIFEST.json is missing or unreadable") from None
+    if manifest.get("format") not in (FORMAT, OLD_FORMAT) or manifest.get("version") != VERSION:
         raise SystemExit(f"Unsupported backup format: {manifest.get('format')!r} "
                          f"version {manifest.get('version')!r}")
-    database = staging / "maxads.db"
-    if not database.is_file():
-        raise SystemExit("The backup holds no maxads.db")
+    database = staged_database(staging)
+    if database is None:
+        raise SystemExit(f"The backup holds no {DB_NAME}")
     conn = sqlite3.connect(database)
     try:
         result = conn.execute("PRAGMA integrity_check").fetchone()[0]
@@ -84,6 +87,14 @@ def check(staging: Path) -> dict:
     if missing:
         say(f"warning: {missing} file(s) named in the database are not in the backup")
     return manifest
+
+
+def staged_database(staging: Path) -> Path | None:
+    """The database file in an unpacked backup, under its new or its old name."""
+    for name in (DB_NAME, OLD_DB_NAME):
+        if (staging / name).is_file():
+            return staging / name
+    return None
 
 
 def move_aside(stamp: str) -> Path | None:
@@ -107,7 +118,7 @@ def put_in_place(staging: Path) -> None:
         # together with its database.
         shutil.rmtree(db_dir)
     db_dir.mkdir(parents=True)
-    os.rename(staging / "maxads.db", config.DB_PATH)
+    os.rename(staged_database(staging), config.DB_PATH)
     for sub in MEDIA_DIRS:
         target = config.BASE_DIR / sub
         if target.exists():

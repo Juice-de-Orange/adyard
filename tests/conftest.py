@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -10,17 +11,20 @@ sys.path.insert(0, str(ROOT))
 @pytest.fixture()
 def app_env(tmp_path, monkeypatch):
     """Point the app at a throwaway directory that looks like a mounted data disk."""
-    base = tmp_path / "maxads"
+    base = tmp_path / "adyard"
     for sub in ("data/raw", "data/media", "data/db", "data/logs", "venv"):
         (base / sub).mkdir(parents=True, exist_ok=True)
     (base / ".mounted").write_text("test")
 
-    monkeypatch.setenv("MAXADS_BASE", str(base))
-    monkeypatch.setenv("MAXADS_SECRET_KEY", "test-secret-key")
-    monkeypatch.setenv("MAXADS_COUNT_SALT", "test-salt")
-    monkeypatch.setenv("MAXADS_PUBLIC_URL", "https://ads.example.com")
-    monkeypatch.delenv("MAXADS_REQUIRE_MOUNT", raising=False)
-    monkeypatch.delenv("MAXADS_ADMIN_PASSWORD", raising=False)
+    # Only what is set here: a stray ADYARD_ or old MAXADS_ variable in the shell
+    # that runs the tests would change what the app reads.
+    for name in list(os.environ):
+        if name.startswith(("ADYARD_", "MAXADS_")):
+            monkeypatch.delenv(name)
+    monkeypatch.setenv("ADYARD_BASE", str(base))
+    monkeypatch.setenv("ADYARD_SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("ADYARD_COUNT_SALT", "test-salt")
+    monkeypatch.setenv("ADYARD_PUBLIC_URL", "https://ads.example.com")
 
     # config caches paths at import time, so drop the modules and re-import.
     for name in [m for m in list(sys.modules) if m.startswith("app")]:

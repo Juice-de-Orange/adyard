@@ -6,26 +6,26 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --system --uid 1000 --home-dir /app --shell /usr/sbin/nologin maxads
+RUN useradd --system --uid 1000 --home-dir /app --shell /usr/sbin/nologin adyard
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
-# /data is the volume for originals, media, database and logs; /run/maxads holds
+# /data is the volume for originals, media, database and logs; /run/adyard holds
 # the wake-up pipe between web and worker (a shared tmpfs in docker-compose.yml).
 # Created here so that fresh named volumes inherit the ownership.
-RUN mkdir -p /data /run/maxads && chown maxads:maxads /data /run/maxads
+RUN mkdir -p /data /run/adyard && chown adyard:adyard /data /run/adyard
 
-ENV MAXADS_BASE=/data \
-    MAXADS_REQUIRE_MOUNT=0 \
-    RUNTIME_DIRECTORY=/run/maxads \
+ENV ADYARD_BASE=/data \
+    ADYARD_REQUIRE_MOUNT=0 \
+    RUNTIME_DIRECTORY=/run/adyard \
     PYTHONUNBUFFERED=1
 
-USER maxads
+USER adyard
 EXPOSE 8080
 # --no-proxy-headers: whose X-Forwarded-For is believed is decided by the app
-# alone (MAXADS_TRUSTED_PROXIES), not by a second, differently configured layer.
+# alone (ADYARD_TRUSTED_PROXIES), not by a second, differently configured layer.
 CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8080", \
      "--no-proxy-headers", "--no-access-log", "--timeout-keep-alive", "15"]

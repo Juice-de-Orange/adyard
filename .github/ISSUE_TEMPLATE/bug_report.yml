@@ -49,5 +49,5 @@ body:
     id: logs
     attributes:
       label: Relevant logs (redacted)
-      description: "`docker compose logs web worker` or `journalctl -u maxads -u maxads-worker`."
+      description: "`docker compose logs web worker` or `journalctl -u adyard -u adyard-worker`."
       render: shell

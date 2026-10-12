@@ -11,7 +11,7 @@ import pytest
 
 
 def _reload(monkeypatch, base: Path):
-    monkeypatch.setenv("MAXADS_BASE", str(base))
+    monkeypatch.setenv("ADYARD_BASE", str(base))
     for name in [m for m in list(sys.modules) if m.startswith("app")]:
         del sys.modules[name]
 
@@ -45,7 +45,7 @@ def test_backup_while_running_restores_into_an_empty_directory(
     from app import backup, config
 
     # A long-lived connection, like the running worker's, keeps the newest
-    # commits in maxads.db-wal: a plain file copy of maxads.db misses them.
+    # commits in adyard.db-wal: a plain file copy of adyard.db misses them.
     holder = sqlite3.connect(config.DB_PATH)
     holder.execute("PRAGMA journal_mode=WAL")
     holder.execute("INSERT INTO events(ad_id, kind, day, visitor) "
@@ -61,7 +61,7 @@ def test_backup_while_running_restores_into_an_empty_directory(
     secret = (app_env / ".count_salt").read_text() if (app_env / ".count_salt").exists() else None
     assert backup.main([str(tmp_path / "backups")]) == 0
     holder.close()
-    [archive] = (tmp_path / "backups").glob("maxads-backup-*.tar")
+    [archive] = (tmp_path / "backups").glob("adyard-backup-*.tar")
     assert archive.stat().st_mode & 0o777 == 0o600, "the archive holds secrets and hashes"
 
     new_base = _fresh_base(tmp_path, "restored")
@@ -99,7 +99,7 @@ def test_backup_to_stdout_and_restore_from_stdin(populated, app_env, tmp_path, m
         assert backup.main(["-"]) == 0
         data = out.getvalue()
     names = tarfile.open(fileobj=io.BytesIO(data)).getnames()
-    assert "MANIFEST.json" in names and "maxads.db" in names
+    assert "MANIFEST.json" in names and "adyard.db" in names
     assert any(n.startswith("data/media/") for n in names)
     assert not any(n.startswith("data/logs") or n.startswith("data/db") for n in names)
 
@@ -128,7 +128,7 @@ def test_restore_over_existing_data_moves_it_aside(populated, app_env, admin_cli
     assert _counts()["ads"] == 2
 
     [aside] = app_env.glob("pre-restore-*")
-    assert (aside / "data/db/maxads.db").read_bytes() == b"this is not a database"
+    assert (aside / "data/db/adyard.db").read_bytes() == b"this is not a database"
     assert len(list((aside / "data/media").glob("*_thumb.webp"))) == 3, "nothing is deleted"
     assert not list(app_env.glob(".restore-*")), "the staging folder is cleaned up"
 

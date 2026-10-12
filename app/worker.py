@@ -14,7 +14,7 @@ import time
 
 from . import config, db, media
 
-log = logging.getLogger("maxads.worker")
+log = logging.getLogger("adyard.worker")
 
 # The worker used to sleep 2 s and look -- 43 200 wake-ups a day, almost always
 # to find nothing. Measured, that cost no noticeable CPU time, but every timer
@@ -177,8 +177,10 @@ def main() -> int:
             logging.StreamHandler(sys.stdout),
         ],
     )
-    for warning in config.unknown_settings():
+    for warning in config.setting_warnings():
         log.warning(warning)
+    if note := config.database_note():
+        log.log(*note)
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 

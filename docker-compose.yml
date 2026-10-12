@@ -1,18 +1,19 @@
 # Quick start: cp .env.example .env && docker compose up -d
 # Then open http://localhost:8080 and log in as "admin" (see README).
-# Another host port: set MAXADS_PORT (and MAXADS_PUBLIC_URL to match) in .env.
+# Another host port: set ADYARD_PORT (and ADYARD_PUBLIC_URL to match) in .env.
 services:
   web:
     build: .
     # Named after the Compose project, so two checkouts on one host do not
     # overwrite each other's image (`-p` or the directory name sets it).
-    image: ${COMPOSE_PROJECT_NAME:-maxads}-app
+    image: ${COMPOSE_PROJECT_NAME:-adyard}-app
     env_file: .env
     ports:
-      - "${MAXADS_PORT:-8080}:8080"
+      # MAXADS_PORT: the name before the rename to adyard, still honoured.
+      - "${ADYARD_PORT:-${MAXADS_PORT:-8080}}:8080"
     volumes:
       - data:/data
-      - runtime:/run/maxads
+      - runtime:/run/adyard
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5).status == 200 else 1)"]
       interval: 30s
@@ -21,17 +22,21 @@ services:
     restart: unless-stopped
 
   worker:
-    image: ${COMPOSE_PROJECT_NAME:-maxads}-app
+    image: ${COMPOSE_PROJECT_NAME:-adyard}-app
     command: ["python", "-m", "app.worker"]
     env_file: .env
     depends_on:
       - web
     volumes:
       - data:/data
-      - runtime:/run/maxads
+      - runtime:/run/adyard
     restart: unless-stopped
 
 volumes:
+  # Named <project>_data, and the project is the checkout's directory name (or
+  # COMPOSE_PROJECT_NAME). A checkout made before the rename to adyard is called
+  # maxads, so its volume is maxads_data: keep updating in that directory, or
+  # see "Coming from maxads" in the README.
   data:
   # Shared tmpfs for the wake-up pipe: an upload in `web` wakes `worker` at once
   # instead of waiting for the five-minute fallback timer.

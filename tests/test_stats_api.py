@@ -190,7 +190,7 @@ def test_api_docs_page_renders(admin_client, app_env):
     _ready_ad(admin_client, app_env, title="doc")
     r = admin_client.get("/api")
     assert r.status_code == 200
-    assert "MaxAds API" in r.text
+    assert "Adyard API" in r.text
     assert "/embed/" in r.text and "/img/" in r.text
 
 
@@ -198,7 +198,7 @@ def test_dashboard_shows_storage_and_metrics(admin_client, app_env):
     _ready_ad(admin_client, app_env, title="dash")
     r = admin_client.get("/")
     assert r.status_code == 200
-    for text in ("Space on the data disk", "Impressions", "Clicks", "Sites", "MaxAds"):
+    for text in ("Space on the data disk", "Impressions", "Clicks", "Sites", "Adyard"):
         assert text in r.text, f"{text!r} missing from the dashboard"
 
 

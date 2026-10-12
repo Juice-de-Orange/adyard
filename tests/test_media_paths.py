@@ -1,4 +1,4 @@
-"""Media paths are stored relative to the data directory (MAXADS_BASE).
+"""Media paths are stored relative to the data directory (ADYARD_BASE).
 
 v0.1 stored absolute paths, so moving the data directory -- another disk, a container
 volume, a restore on a new host -- turned every banner into a 404.
@@ -21,7 +21,7 @@ def _restart(monkeypatch, base=None):
     """A fresh process on (possibly another) data directory."""
     from fastapi.testclient import TestClient
     if base is not None:
-        monkeypatch.setenv("MAXADS_BASE", str(base))
+        monkeypatch.setenv("ADYARD_BASE", str(base))
     for name in [m for m in list(sys.modules) if m.startswith("app")]:
         del sys.modules[name]
     from app.main import create_app
@@ -46,7 +46,7 @@ def test_a_new_banner_is_stored_with_relative_paths(admin_client, make_ad):
 def test_banners_survive_moving_the_data_directory(admin_client, app_env, make_ad,
                                                    tmp_path, monkeypatch):
     slug = make_ad(admin_client)
-    moved = tmp_path / "elsewhere" / "maxads"
+    moved = tmp_path / "elsewhere" / "adyard"
     moved.parent.mkdir()
     shutil.move(str(app_env), str(moved))
 
@@ -97,7 +97,7 @@ def test_paths_outside_the_data_directory_are_left_and_logged(admin_client, app_
 
     with caplog.at_level(logging.WARNING):
         client = _restart(monkeypatch)
-    assert _row(slug)["media_path"] == str(media), "a path outside MAXADS_BASE is not touched"
+    assert _row(slug)["media_path"] == str(media), "a path outside ADYARD_BASE is not touched"
     assert f"ad {slug}: media_path {media} is outside the data directory" in caplog.text
     # Still delivered from where it is.
     assert client.get(f"/m/{slug}").status_code == 200

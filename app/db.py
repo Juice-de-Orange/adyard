@@ -12,7 +12,7 @@ from typing import Iterator
 
 from . import config
 
-log = logging.getLogger("maxads.db")
+log = logging.getLogger("adyard.db")
 
 # The columns that point at files in the data directory.
 MEDIA_COLUMNS = ("raw_path", "media_path", "thumb_path")

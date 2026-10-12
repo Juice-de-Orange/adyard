@@ -1,4 +1,4 @@
-/* maxads embed snippet -- rendered per ad, served as application/javascript.
+/* adyard embed snippet -- rendered per ad, served as application/javascript.
    Usage on a foreign page:
      <script src="{{ base }}/embed/{{ slug }}.js" async></script>          */
 (function () {
@@ -16,8 +16,8 @@
   }
 
   var box = document.createElement("div");
-  box.className = "maxads";
-  box.setAttribute("data-maxads", SLUG);
+  box.className = "adyard";
+  box.setAttribute("data-adyard", SLUG);
   // Reserving the aspect ratio up front is what stops the host page from
   // jumping once the media loads.
   var cap = MAXW > 0 ? Math.min(MAXW, W || MAXW) : (W || 800);

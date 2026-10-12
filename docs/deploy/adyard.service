@@ -2,37 +2,37 @@
 # to /etc/systemd/system/. Lines without that mark work as they are.
 # See docs/deploy/systemd.md.
 [Unit]
-Description=MaxAds web service
-Documentation=https://github.com/Juice-de-Orange/maxads
+Description=Adyard web service
+Documentation=https://github.com/Juice-de-Orange/adyard
 After=network-online.target
 Wants=network-online.target
-# ADJUST: the data directory (MAXADS_BASE). If it is a separate disk, systemd
+# ADJUST: the data directory (ADYARD_BASE). If it is a separate disk, systemd
 # waits for it.
-RequiresMountsFor=/srv/maxads
+RequiresMountsFor=/srv/adyard
 
 [Service]
 Type=exec
 # ADJUST: the account the service runs as.
-User=maxads
-Group=maxads
+User=adyard
+Group=adyard
 # ADJUST: the checkout of this repository.
-WorkingDirectory=/opt/maxads
+WorkingDirectory=/opt/adyard
 Environment=PYTHONUNBUFFERED=1
 # ADJUST: the data directory.
-Environment=MAXADS_BASE=/srv/maxads
+Environment=ADYARD_BASE=/srv/adyard
 # ADJUST: the environment file (see .env.example).
-EnvironmentFile=-/etc/maxads.env
+EnvironmentFile=-/etc/adyard.env
 # Refuse to start when the data disk is gone. Without this the service would
 # happily write into an empty directory on the system disk and lose every upload.
-# ADJUST: the data directory (MAXADS_BASE).
-ExecStartPre=/usr/bin/test -f /srv/maxads/.mounted
+# ADJUST: the data directory (ADYARD_BASE).
+ExecStartPre=/usr/bin/test -f /srv/adyard/.mounted
 # --no-access-log: the reverse proxy already logs every request. A second line
 # per banner request only costs writes and says nothing new.
 # --no-proxy-headers: which proxy may set X-Forwarded-For is decided by the app
-# (MAXADS_TRUSTED_PROXIES in the environment file, default 127.0.0.1 and ::1).
+# (ADYARD_TRUSTED_PROXIES in the environment file, default 127.0.0.1 and ::1).
 # ADJUST: the venv path; --host and --port if the reverse proxy runs on another
-# machine (then also MAXADS_TRUSTED_PROXIES).
-ExecStart=/opt/maxads/venv/bin/uvicorn app.main:create_app --factory \
+# machine (then also ADYARD_TRUSTED_PROXIES).
+ExecStart=/opt/adyard/venv/bin/uvicorn app.main:create_app --factory \
           --host 127.0.0.1 --port 8080 --no-proxy-headers \
           --no-access-log --timeout-keep-alive 15
 Restart=on-failure
@@ -40,11 +40,11 @@ RestartSec=5
 
 
 # ── Frugality ─────────────────────────────────────────────────────────────
-# RuntimeDirectory creates /run/maxads as a tmpfs directory (owned by maxads).
+# RuntimeDirectory creates /run/adyard as a tmpfs directory (owned by adyard).
 # The wake-up pipe between web and worker lives there -- in RAM, not on disk.
-RuntimeDirectory=maxads
+RuntimeDirectory=adyard
 RuntimeDirectoryMode=0750
-# Without this systemd removes /run/maxads as soon as ONE of the two units
+# Without this systemd removes /run/adyard as soon as ONE of the two units
 # stops -- the worker would then hold a descriptor to a deleted FIFO and never
 # be woken again. The fallback timer hides that, so it only shows when an
 # upload hangs for five minutes.
@@ -60,8 +60,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# ADJUST: the data directory (MAXADS_BASE).
-ReadWritePaths=/srv/maxads
+# ADJUST: the data directory (ADYARD_BASE).
+ReadWritePaths=/srv/adyard
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true

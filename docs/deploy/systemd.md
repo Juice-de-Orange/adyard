@@ -1,4 +1,4 @@
-# Running MaxAds with systemd
+# Running Adyard with systemd
 
 The Docker setup in the README is the quick path. This page is for a plain Linux
 host (or an LXC/VM) with the two hardened units in this folder. Paths below are
@@ -6,31 +6,31 @@ the ones the templates use — change them consistently if yours differ.
 
 | Path | What |
 |---|---|
-| `/opt/maxads` | the code (a checkout of this repository) and `venv/` |
-| `/srv/maxads` | `MAXADS_BASE`: originals, media, database, logs — ideally its own disk |
-| `/etc/maxads.env` | environment, see [`.env.example`](../../.env.example) |
-| `/run/maxads` | created by systemd: the wake-up pipe between web and worker |
+| `/opt/adyard` | the code (a checkout of this repository) and `venv/` |
+| `/srv/adyard` | `ADYARD_BASE`: originals, media, database, logs — ideally its own disk |
+| `/etc/adyard.env` | environment, see [`.env.example`](../../.env.example) |
+| `/run/adyard` | created by systemd: the wake-up pipe between web and worker |
 
 ## Install
 
 ```bash
 sudo apt-get install -y python3 python3-venv ffmpeg
-sudo useradd --system --home-dir /opt/maxads --shell /usr/sbin/nologin maxads
+sudo useradd --system --home-dir /opt/adyard --shell /usr/sbin/nologin adyard
 
-sudo git clone https://github.com/Juice-de-Orange/maxads.git /opt/maxads
-sudo python3 -m venv /opt/maxads/venv
-sudo /opt/maxads/venv/bin/pip install -r /opt/maxads/requirements.txt
+sudo git clone https://github.com/Juice-de-Orange/adyard.git /opt/adyard
+sudo python3 -m venv /opt/adyard/venv
+sudo /opt/adyard/venv/bin/pip install -r /opt/adyard/requirements.txt
 
 # The data directory. On a separate disk: mount it first, then create the
 # sentinel ON the mounted disk -- the service refuses to start without it.
-sudo mkdir -p /srv/maxads
-sudo touch /srv/maxads/.mounted
-sudo chown -R maxads:maxads /opt/maxads /srv/maxads
+sudo mkdir -p /srv/adyard
+sudo touch /srv/adyard/.mounted
+sudo chown -R adyard:adyard /opt/adyard /srv/adyard
 
-sudo install -m 600 /opt/maxads/.env.example /etc/maxads.env   # then edit it
-sudo install -m 644 /opt/maxads/docs/deploy/maxads.service /opt/maxads/docs/deploy/maxads-worker.service /etc/systemd/system/
+sudo install -m 600 /opt/adyard/.env.example /etc/adyard.env   # then edit it
+sudo install -m 644 /opt/adyard/docs/deploy/adyard.service /opt/adyard/docs/deploy/adyard-worker.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now maxads.service maxads-worker.service
+sudo systemctl enable --now adyard.service adyard-worker.service
 ```
 
 The dashboard stylesheet comes prebuilt with the checkout
@@ -39,20 +39,20 @@ classes in a template, rebuild it with `sh scripts/build-css.sh` (standalone
 Tailwind CLI, pinned and checksum-verified, no Node.js).
 
 The generated first-admin password is in the journal once:
-`journalctl -u maxads | grep "First admin"`. Set `MAXADS_ADMIN_PASSWORD` in
-`/etc/maxads.env` before the first start if you prefer to choose it.
+`journalctl -u adyard | grep "First admin"`. Set `ADYARD_ADMIN_PASSWORD` in
+`/etc/adyard.env` before the first start if you prefer to choose it.
 
 ## Reverse proxy
 
-The web unit listens on `127.0.0.1:8080`. MaxAds tells visitors apart by their
+The web unit listens on `127.0.0.1:8080`. Adyard tells visitors apart by their
 address, so it must know which peer may report the real one in
-`X-Forwarded-For`: `MAXADS_TRUSTED_PROXIES` in `/etc/maxads.env`, default
+`X-Forwarded-For`: `ADYARD_TRUSTED_PROXIES` in `/etc/adyard.env`, default
 `127.0.0.1,::1` — right for a proxy on the same machine. From every other peer
 the header is ignored, so nobody can inflate the impressions by sending a new
 address with each request.
 
-If your proxy runs on another machine, change `--host` in `maxads.service` and
-set `MAXADS_TRUSTED_PROXIES` to the proxy's address (e.g. `192.0.2.10`). Units
+If your proxy runs on another machine, change `--host` in `adyard.service` and
+set `ADYARD_TRUSTED_PROXIES` to the proxy's address (e.g. `192.0.2.10`). Units
 from v0.1.0 that still pass `--proxy-headers --forwarded-allow-ips=…` keep
 working, but replace those two options with `--no-proxy-headers` so the
 environment file is the only place that decides. Example for Caddy:
@@ -63,7 +63,7 @@ ads.example.com {
 }
 ```
 
-Set `MAXADS_PUBLIC_URL=https://ads.example.com` in `/etc/maxads.env`.
+Set `ADYARD_PUBLIC_URL=https://ads.example.com` in `/etc/adyard.env`.
 
 ## Backup and restore
 
@@ -73,48 +73,80 @@ the checkout:
 
 ```bash
 # Backup -- while the service runs. The tar lands in your own home directory.
-cd /opt/maxads
-(umask 077; sudo -u maxads env MAXADS_BASE=/srv/maxads venv/bin/python -m app.backup - \
-  > ~/maxads-backup-$(date +%Y%m%d-%H%M%S).tar)
+cd /opt/adyard
+(umask 077; sudo -u adyard env ADYARD_BASE=/srv/adyard venv/bin/python -m app.backup - \
+  > ~/adyard-backup-$(date +%Y%m%d-%H%M%S).tar)
 
 # Restore -- with both units stopped.
-sudo systemctl stop maxads-worker.service maxads.service
-cd /opt/maxads
-sudo -u maxads env MAXADS_BASE=/srv/maxads venv/bin/python -m app.restore - \
-  < ~/maxads-backup-20261012-120000.tar
-sudo systemctl start maxads.service maxads-worker.service
+sudo systemctl stop adyard-worker.service adyard.service
+cd /opt/adyard
+sudo -u adyard env ADYARD_BASE=/srv/adyard venv/bin/python -m app.restore - \
+  < ~/adyard-backup-20261012-120000.tar
+sudo systemctl start adyard.service adyard-worker.service
 ```
 
-The previous data ends up in `/srv/maxads/pre-restore-<time>/`; delete it once
+The previous data ends up in `/srv/adyard/pre-restore-<time>/`; delete it once
 the restored service runs as it should. For a nightly backup, a root cron job or
 timer can run the backup line and rotate the files.
 
 ## Updating
 
 Take a backup first (above; on v0.1.0, which has no backup command, stop both
-units and copy `/srv/maxads` with `cp -a` or `tar`). Then:
+units and copy `/srv/adyard` with `cp -a` or `tar`). Then:
 
 ```bash
-cd /opt/maxads && sudo -u maxads git pull
-sudo -u maxads /opt/maxads/venv/bin/pip install -r requirements.txt
+cd /opt/adyard && sudo -u adyard git pull
+sudo -u adyard /opt/adyard/venv/bin/pip install -r requirements.txt
 # One at a time: `systemctl restart A B` is ONE transaction, and a worker that
 # finishes a running transcode would keep the web service down meanwhile.
-sudo systemctl restart maxads.service
-sudo systemctl restart maxads-worker.service
+sudo systemctl restart adyard.service
+sudo systemctl restart adyard-worker.service
 curl -fsS http://127.0.0.1:8080/healthz
 ```
 
 The first start after the update from v0.1.0 converts the media paths stored in
-the database to paths relative to `MAXADS_BASE`
-(`journalctl -u maxads -u maxads-worker | grep "media path"` shows
-`… media path(s) converted to relative`). Paths outside `MAXADS_BASE` are left
+the database to paths relative to `ADYARD_BASE`
+(`journalctl -u adyard -u adyard-worker | grep "media path"` shows
+`… media path(s) converted to relative`). Paths outside `ADYARD_BASE` are left
 as they are and logged. Move the data directory only after that first start.
+
+### Coming from maxads
+
+Until v0.2 the project was called maxads. An installation from that time keeps
+its own names — `/opt/maxads`, `/srv/maxads`, `/etc/maxads.env`, the units
+`maxads.service` and `maxads-worker.service`, the user `maxads` — and keeps
+working with them; use those names in the commands on this page. Update it in
+place as above: `git pull` follows GitHub's redirect to the new repository
+(`sudo -u maxads git -C /opt/maxads remote set-url origin
+https://github.com/Juice-de-Orange/adyard.git` makes it explicit).
+
+- **Variables:** the `MAXADS_*` names in the environment file and in the units'
+  `Environment=` lines are still read, and both units log one warning per old
+  name. To rename them (an `ADYARD_` name wins over its old one):
+
+  ```bash
+  sudo sed -i 's/^MAXADS_/ADYARD_/' /etc/maxads.env
+  sudo sed -i 's/^Environment=MAXADS_/Environment=ADYARD_/' \
+    /etc/systemd/system/maxads.service /etc/systemd/system/maxads-worker.service
+  sudo systemctl daemon-reload   # then restart both, one at a time
+  ```
+- **Database:** the file `data/db/maxads.db` is used as long as there is no
+  `adyard.db` next to it; the log says so at start. Nothing renames it for you.
+  To rename it, stop both units, check that SQLite has removed
+  `maxads.db-wal` on the clean stop (if not, start and stop them once more),
+  then `sudo -u maxads mv /srv/maxads/data/db/maxads.db /srv/maxads/data/db/adyard.db`
+  and start them again.
+- **Going back to v0.1.0** after renaming: it knows only `MAXADS_*` and
+  `maxads.db`, so rename those back first — otherwise it starts on an empty
+  database.
+- **Sessions:** the session cookie is now `adyard_session`, so everyone signs
+  in once more after the update.
 
 ## When something is stuck
 
 ```bash
-systemctl status maxads maxads-worker
-journalctl -u maxads-worker -n 50
+systemctl status adyard adyard-worker
+journalctl -u adyard-worker -n 50
 curl -s http://127.0.0.1:8080/healthz
 ```
 
@@ -127,7 +159,7 @@ run without it.
 
 ## What the units restrict
 
-Both units run as `maxads`, with `NoNewPrivileges`, `ProtectSystem=strict`,
+Both units run as `adyard`, with `NoNewPrivileges`, `ProtectSystem=strict`,
 `ProtectHome`, `PrivateTmp` and write access only to the data directory. Memory
 and task limits sit well above normal use (the web process needs about 40 MB);
 the worker runs with `Nice=10`, idle I/O priority and a low CPU weight so that

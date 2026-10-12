@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-MaxAds is developed on `main`; fixes land there. Please update to the latest
+Adyard is developed on `main`; fixes land there. Please update to the latest
 commit before reporting.
 
 ## Reporting a vulnerability
@@ -25,7 +25,7 @@ container image and the systemd units.
 
 Worth knowing up front, and not a vulnerability by itself:
 
-- Every account has full rights by design; MaxAds is a tool for a small team.
+- Every account has full rights by design; Adyard is a tool for a small team.
 - The public endpoints are open to any origin (`Access-Control-Allow-Origin: *`)
   on purpose — banners are embedded on foreign pages.
 - Run it behind a reverse proxy with TLS. Over plain HTTP the session cookie

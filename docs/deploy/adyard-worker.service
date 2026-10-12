@@ -2,28 +2,28 @@
 # to /etc/systemd/system/. Lines without that mark work as they are.
 # See docs/deploy/systemd.md.
 [Unit]
-Description=MaxAds media worker (image and video optimisation)
-Documentation=https://github.com/Juice-de-Orange/maxads
-After=maxads.service
-# ADJUST: the data directory (MAXADS_BASE).
-RequiresMountsFor=/srv/maxads
+Description=Adyard media worker (image and video optimisation)
+Documentation=https://github.com/Juice-de-Orange/adyard
+After=adyard.service
+# ADJUST: the data directory (ADYARD_BASE).
+RequiresMountsFor=/srv/adyard
 
 [Service]
 Type=exec
 # ADJUST: the account the service runs as.
-User=maxads
-Group=maxads
+User=adyard
+Group=adyard
 # ADJUST: the checkout of this repository.
-WorkingDirectory=/opt/maxads
+WorkingDirectory=/opt/adyard
 Environment=PYTHONUNBUFFERED=1
 # ADJUST: the data directory.
-Environment=MAXADS_BASE=/srv/maxads
+Environment=ADYARD_BASE=/srv/adyard
 # ADJUST: the environment file (see .env.example).
-EnvironmentFile=-/etc/maxads.env
-# ADJUST: the data directory (MAXADS_BASE).
-ExecStartPre=/usr/bin/test -f /srv/maxads/.mounted
+EnvironmentFile=-/etc/adyard.env
+# ADJUST: the data directory (ADYARD_BASE).
+ExecStartPre=/usr/bin/test -f /srv/adyard/.mounted
 # ADJUST: the venv path.
-ExecStart=/opt/maxads/venv/bin/python -m app.worker
+ExecStart=/opt/adyard/venv/bin/python -m app.worker
 Restart=on-failure
 RestartSec=5
 # Transcoding must never starve the web service.
@@ -37,9 +37,9 @@ IOWeight=20
 
 # ── Frugality ─────────────────────────────────────────────────────────────
 # Same runtime directory as the web unit: the wake-up pipe lives in RAM.
-RuntimeDirectory=maxads
+RuntimeDirectory=adyard
 RuntimeDirectoryMode=0750
-# See maxads.service: without this the FIFO disappears when one unit stops.
+# See adyard.service: without this the FIFO disappears when one unit stops.
 RuntimeDirectoryPreserve=yes
 
 # ffmpeg needs room for large videos -- the limit is deliberately generous.
@@ -50,8 +50,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# ADJUST: the data directory (MAXADS_BASE).
-ReadWritePaths=/srv/maxads
+# ADJUST: the data directory (ADYARD_BASE).
+ReadWritePaths=/srv/adyard
 RestrictSUIDSGID=true
 
 [Install]
