@@ -1,15 +1,15 @@
-"""Back up a MaxAds data directory into one tar file -- safe while the service runs.
+"""Back up an Adyard data directory into one tar file -- safe while the service runs.
 
-    python -m app.backup <target-dir>   # writes <target-dir>/maxads-backup-<UTC time>.tar
+    python -m app.backup <target-dir>   # writes <target-dir>/adyard-backup-<UTC time>.tar
     python -m app.backup -              # writes the tar to stdout
 
 The database is copied with SQLite's online backup API. A plain copy of
-maxads.db would be wrong in two ways while web and worker run: committed
-transactions that still sit in maxads.db-wal would be missing, and a page
+adyard.db would be wrong in two ways while web and worker run: committed
+transactions that still sit in adyard.db-wal would be missing, and a page
 written during the copy could leave a torn file. The backup API reads through
 SQLite and sees exactly one committed state.
 
-The archive holds that database copy (maxads.db), the originals (data/raw/), the
+The archive holds that database copy (adyard.db), the originals (data/raw/), the
 delivered media (data/media/), the generated secrets .secret_key and .count_salt
 if they exist, and MANIFEST.json. Logs are left out. The secrets and the
 password hashes make the file sensitive: it is created with mode 0600.
@@ -28,7 +28,12 @@ from pathlib import Path
 
 from . import config
 
-FORMAT = "maxads-backup"
+FORMAT = "adyard-backup"
+# Backups made before the rename say "maxads-backup" and hold maxads.db; the
+# content is the same, so restore takes them too.
+OLD_FORMAT = "maxads-backup"
+DB_NAME = "adyard.db"
+OLD_DB_NAME = "maxads.db"
 VERSION = 1
 SECRET_FILES = (".secret_key", ".count_salt")
 MEDIA_DIRS = ("data/raw", "data/media")
@@ -42,7 +47,7 @@ def say(message: str) -> None:
 def snapshot_database(target: Path) -> dict[str, int]:
     """Copy the live database to `target` and return a few row counts."""
     if not config.DB_PATH.exists():
-        raise SystemExit(f"No database at {config.DB_PATH} -- is MAXADS_BASE right?")
+        raise SystemExit(f"No database at {config.DB_PATH} -- is ADYARD_BASE right?")
     source = sqlite3.connect(config.DB_PATH, timeout=30)
     copy = sqlite3.connect(target)
     try:
@@ -80,7 +85,7 @@ def write_archive(tar: tarfile.TarFile, db_copy: Path, counts: dict[str, int]) -
         "counts": counts,
     }
     _add_bytes(tar, "MANIFEST.json", json.dumps(manifest, indent=2).encode())
-    tar.add(db_copy, arcname="maxads.db")
+    tar.add(db_copy, arcname=DB_NAME)
     for name in SECRET_FILES:
         path = config.BASE_DIR / name
         if path.is_file():
@@ -116,8 +121,8 @@ def main(argv: list[str] | None = None) -> int:
     config.ensure_dirs()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
-    with tempfile.TemporaryDirectory(prefix="maxads-backup-") as tmp:
-        db_copy = Path(tmp) / "maxads.db"
+    with tempfile.TemporaryDirectory(prefix="adyard-backup-") as tmp:
+        db_copy = Path(tmp) / DB_NAME
         counts = snapshot_database(db_copy)
 
         if target == "-":
@@ -130,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
 
         out_dir = Path(target)
         out_dir.mkdir(parents=True, exist_ok=True)
-        final = out_dir / f"maxads-backup-{stamp}.tar"
+        final = out_dir / f"adyard-backup-{stamp}.tar"
         part = out_dir / f".{final.name}.part"
         fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         try:

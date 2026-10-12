@@ -96,7 +96,7 @@ def ensure_first_admin(conn: sqlite3.Connection,
                        password: str | None = None) -> tuple[str, str, bool] | None:
     """Create the initial admin if no user exists yet.
 
-    With `password` (from MAXADS_ADMIN_PASSWORD) the operator chose it, so it
+    With `password` (from ADYARD_ADMIN_PASSWORD) the operator chose it, so it
     stays. Without, a random one is generated and must be changed on the first
     login. Returns (username, password, generated) exactly once -- the caller
     decides where the password may appear, which is never the log file.

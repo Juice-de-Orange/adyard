@@ -1,10 +1,10 @@
-# MaxAds
+# Adyard
 
 **Self-hosted banner ads: upload an image or video, get it web-optimised, embed
 it anywhere with one line, and count impressions and clicks without storing a
 single IP address.**
 
-![The MaxAds dashboard: impressions, clicks, storage and the sites running your ads](docs/screenshot.png)
+![The Adyard dashboard: impressions, clicks, storage and the sites running your ads](docs/screenshot.png)
 
 A small service for running your own banners on your own and friendly sites —
 no ad network, no third-party tracking. It is deliberately boring to operate:
@@ -40,24 +40,24 @@ docker compose logs web | grep "First admin"   # the generated password, shown o
 ```
 
 Open <http://localhost:8080>, log in as `admin` with that password and choose a
-new one — MaxAds asks for it on the first login. To pick the first password
-yourself, set `MAXADS_ADMIN_PASSWORD` in `.env` before the first start.
+new one — Adyard asks for it on the first login. To pick the first password
+yourself, set `ADYARD_ADMIN_PASSWORD` in `.env` before the first start.
 
-Port 8080 already taken? Set `MAXADS_PORT` in `.env` (e.g. `MAXADS_PORT=9090`)
-and the same port in `MAXADS_PUBLIC_URL`, then open that port instead.
+Port 8080 already taken? Set `ADYARD_PORT` in `.env` (e.g. `ADYARD_PORT=9090`)
+and the same port in `ADYARD_PUBLIC_URL`, then open that port instead.
 
 The generated password is only in the container log, and `docker compose down`
 removes that log. If it is gone before your first login, start over with
 `docker compose down -v` (this deletes the data volume, uploads included) and
-`docker compose up -d`: a new password is generated. `MAXADS_ADMIN_PASSWORD` is
+`docker compose up -d`: a new password is generated. `ADYARD_ADMIN_PASSWORD` is
 only read while no account exists, so setting it later does not reset anything.
 
 For a public setup, put the service behind a reverse proxy with TLS and set
-`MAXADS_PUBLIC_URL` (e.g. `https://ads.example.com`) — the embed snippets point
+`ADYARD_PUBLIC_URL` (e.g. `https://ads.example.com`) — the embed snippets point
 there. Running it without Docker: [docs/deploy/systemd.md](docs/deploy/systemd.md).
 
-Visitors are told apart by their address, so MaxAds believes `X-Forwarded-For`
-only from the peers in `MAXADS_TRUSTED_PROXIES` (default `127.0.0.1,::1`: a proxy
+Visitors are told apart by their address, so Adyard believes `X-Forwarded-For`
+only from the peers in `ADYARD_TRUSTED_PROXIES` (default `127.0.0.1,::1`: a proxy
 on the same machine, the systemd setup). Reached directly, as in the quick start,
 nothing needs setting — a forged header is ignored. Behind a proxy in front of
 the Docker setup, its connections arrive from a Docker network, so set the
@@ -74,7 +74,7 @@ Commands for the Docker setup, run in the checkout. Without Docker:
 **Backup** — while the service runs:
 
 ```bash
-(umask 077; docker compose exec -T web python -m app.backup - > maxads-backup-$(date +%Y%m%d-%H%M%S).tar)
+(umask 077; docker compose exec -T web python -m app.backup - > adyard-backup-$(date +%Y%m%d-%H%M%S).tar)
 ```
 
 One tar file with a consistent copy of the database (SQLite's online backup
@@ -89,7 +89,7 @@ the data volume instead, give a directory: `python -m app.backup /data/backups`.
 
 ```bash
 docker compose stop web worker
-docker compose run --rm -T --no-deps web python -m app.restore - < maxads-backup-20261012-120000.tar
+docker compose run --rm -T --no-deps web python -m app.restore - < adyard-backup-20261012-120000.tar
 docker compose up -d
 ```
 
@@ -115,16 +115,37 @@ data volume first, then update as above.
 
 ```bash
 docker compose stop web worker
-(umask 077; docker compose run --rm -T --no-deps web tar -C /data -cf - . > maxads-v0.1-data.tar)
+(umask 077; docker compose run --rm -T --no-deps web tar -C /data -cf - . > adyard-v0.1-data.tar)
 ```
 
 (To go back: check out `v0.1.0`, `docker compose build`, `docker compose stop web worker`,
-then `docker compose run --rm -T --no-deps web tar -C /data -xf - < maxads-v0.1-data.tar`
+then `docker compose run --rm -T --no-deps web tar -C /data -xf - < adyard-v0.1-data.tar`
 and `docker compose up -d`.) The first start of the new version converts the stored media paths to paths
 relative to the data directory and says so in the log of whichever of web and
 worker starts first (`docker compose logs | grep "media path"` shows
 `… media path(s) converted to relative`); from then on the data directory can move. Move it only after that
 first start.
+
+*Coming from maxads* — the name of this project until v0.2. Update in place, in
+the checkout you have (`git pull` follows GitHub's redirect;
+`git remote set-url origin https://github.com/Juice-de-Orange/adyard.git` makes
+it explicit). Compose names the project, and with it the data volume, after that
+directory — `maxads_data` for a checkout called `maxads` — so the data stays
+where it is. A new checkout in another directory would start with an empty
+volume instead; to point it at the old one, run
+`echo COMPOSE_PROJECT_NAME=maxads >> .env` there before its first start
+(`docker volume ls` shows the name). After the update:
+
+- The `MAXADS_*` variables in `.env` still work; web and worker log one warning
+  per old name. `sed -i 's/^MAXADS_/ADYARD_/' .env` renames them; an `ADYARD_`
+  name wins over its old one. (v0.1.0 reads only the old names: rename them
+  back before going back to it.)
+- The database file in the volume keeps its old name, `maxads.db`, and is used
+  as it is (the log says so at start).
+- Everyone signs in once more: the session cookie has a new name.
+- The embed box on host pages has the class `adyard` and `data-adyard` instead
+  of `maxads` and `data-maxads`; CSS on a host page aimed at the old class needs
+  the new one.
 
 ## Embedding
 
@@ -198,8 +219,8 @@ start without them; uvicorn listens on 8000, so the public URL has to say so or 
 point at the wrong port):
 
 ```bash
-export MAXADS_BASE=/tmp/maxads MAXADS_REQUIRE_MOUNT=0 RUNTIME_DIRECTORY=/tmp/maxads-run
-export MAXADS_PUBLIC_URL=http://localhost:8000
+export ADYARD_BASE=/tmp/adyard ADYARD_REQUIRE_MOUNT=0 RUNTIME_DIRECTORY=/tmp/adyard-run
+export ADYARD_PUBLIC_URL=http://localhost:8000
 uvicorn app.main:create_app --factory --reload &
 python -m app.worker
 ```
@@ -215,7 +236,7 @@ guard.
 
 Built in September 2026 and deployed on a single small host since then.
 Feature-complete for its purpose; open ideas are in the
-[issues](https://github.com/Juice-de-Orange/maxads/issues).
+[issues](https://github.com/Juice-de-Orange/adyard/issues).
 
 Checked on a fresh clone with the Docker quick start and a real browser (upload, conversion,
 delivery, embed on another origin, statistics, pause, delete, restart). Not verified in that check:

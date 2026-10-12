@@ -7,7 +7,7 @@
 # fails when the committed file does not match the templates.
 #
 # Uses the standalone Tailwind CLI (no Node.js needed) in the version the
-# dashboard was designed with, downloaded once into ~/.cache/maxads and checked
+# dashboard was designed with, downloaded once into ~/.cache/adyard and checked
 # against the published SHA-256.
 set -eu
 
@@ -21,7 +21,7 @@ case "$(uname -s)-$(uname -m)" in
      exit 1 ;;
 esac
 
-cache="${XDG_CACHE_HOME:-$HOME/.cache}/maxads"
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/adyard"
 bin="$cache/$asset-$VERSION"
 if [ ! -f "$bin" ]; then
   mkdir -p "$cache"

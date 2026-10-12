@@ -6,10 +6,10 @@ import pytest
 
 
 def test_refuses_to_start_without_the_sentinel(tmp_path, monkeypatch):
-    base = tmp_path / "maxads"
+    base = tmp_path / "adyard"
     base.mkdir()  # exists, but the disk is NOT mounted -- no .mounted file
-    monkeypatch.setenv("MAXADS_BASE", str(base))
-    monkeypatch.delenv("MAXADS_REQUIRE_MOUNT", raising=False)
+    monkeypatch.setenv("ADYARD_BASE", str(base))
+    monkeypatch.delenv("ADYARD_REQUIRE_MOUNT", raising=False)
     for name in [m for m in list(sys.modules) if m.startswith("app")]:
         del sys.modules[name]
 
@@ -31,8 +31,8 @@ def test_guard_can_be_switched_off_for_plain_volumes(tmp_path, monkeypatch):
     """A container volume cannot drop out on its own, so the sentinel is optional there."""
     base = tmp_path / "volume"
     base.mkdir()
-    monkeypatch.setenv("MAXADS_BASE", str(base))
-    monkeypatch.setenv("MAXADS_REQUIRE_MOUNT", "0")
+    monkeypatch.setenv("ADYARD_BASE", str(base))
+    monkeypatch.setenv("ADYARD_REQUIRE_MOUNT", "0")
     for name in [m for m in list(sys.modules) if m.startswith("app")]:
         del sys.modules[name]
 

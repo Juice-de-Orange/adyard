@@ -80,7 +80,7 @@ def test_the_wait_doubles_with_every_further_failure(app_env, clock):
 def test_rotating_addresses_does_not_help_against_one_account(app_env, monkeypatch, clock):
     """Behind a trusted proxy every attempt can come from a new address -- the per-account
     counter still slows the guessing down."""
-    monkeypatch.setenv("MAXADS_TRUSTED_PROXIES", "10.0.0.0/8")
+    monkeypatch.setenv("ADYARD_TRUSTED_PROXIES", "10.0.0.0/8")
     client = _client(clock, peer="10.0.0.5")
     for i in range(5):
         assert _login(client, "wrong", **{"x-forwarded-for": f"198.51.100.{i}"}).status_code == 401
@@ -105,7 +105,7 @@ def test_a_forged_header_from_an_untrusted_peer_does_not_reset_the_address(app_e
 
 def test_others_can_still_log_in(app_env, monkeypatch, clock):
     """A lock on one address and one account leaves everyone else alone."""
-    monkeypatch.setenv("MAXADS_TRUSTED_PROXIES", "10.0.0.0/8")
+    monkeypatch.setenv("ADYARD_TRUSTED_PROXIES", "10.0.0.0/8")
     client = _client(clock, peer="10.0.0.5")
     from app import auth, db
     with db.session() as conn:

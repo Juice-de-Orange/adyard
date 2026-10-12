@@ -5,10 +5,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed from maxads to adyard: repository `Juice-de-Orange/adyard`, product
+  name, page titles, log names (`adyard.web`, `adyard.worker`), Docker image
+  (`<project>-app`, default project `adyard`), container user, systemd unit
+  templates (`adyard.service`, `adyard-worker.service`) and their paths. Older
+  entries below keep the old name. An existing installation keeps working
+  without changes (README → "Coming from maxads"):
+  - Settings are `ADYARD_*` now. The old `MAXADS_*` names are still read, with
+    one warning per old name at start; when both are set, the `ADYARD_` one
+    wins.
+  - The database file is `adyard.db`; an existing `maxads.db` is used as long as
+    there is no `adyard.db` next to it. Nothing is renamed automatically.
+  - The Compose data volume is still named after the checkout directory, so an
+    update in place keeps it.
+  - Backups are `adyard-backup-*.tar`; backups made under the old name restore
+    as before.
+  - The session cookie is `adyard_session`: everyone signs in once more.
+  - The embed box carries `class="adyard"` and `data-adyard` instead of
+    `maxads` / `data-maxads`.
+
 ### Security
 
 - `X-Forwarded-For` is believed only from the reverse proxies listed in the new
-  setting `MAXADS_TRUSTED_PROXIES` (default `127.0.0.1,::1`). Before, any client
+  setting `ADYARD_TRUSTED_PROXIES` (default `127.0.0.1,::1`). Before, any client
   could send a different address with every request and inflate impressions and
   clicks past the per-day deduplication (#2). Behind a proxy that is not on the
   same machine (for example a proxy container in front of the Docker setup), set
@@ -28,7 +49,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
-- Moving the data directory (`MAXADS_BASE`) no longer breaks every banner: media
+- Moving the data directory (`ADYARD_BASE`) no longer breaks every banner: media
   paths are stored relative to it. Paths that v0.1 stored absolute are converted
   on the first start of this version, as long as they lie under the configured
   data directory; anything else is left as it is and logged. So update first,
@@ -53,9 +74,9 @@ All notable changes to this project are documented here. The format follows
   move to whoever removed them. Nobody can remove their own account or the last
   one (#3).
 
-- Web service and worker warn at start about `MAXADS_` variables they do not
-  know, with the closest known name (a typo used to leave the default in place
-  without a word).
+- Web service and worker warn at start about `ADYARD_` (and old `MAXADS_`)
+  variables they do not know, with the closest known name (a typo used to leave
+  the default in place without a word).
 
 ## [0.1.0] - 2026-10-06
 

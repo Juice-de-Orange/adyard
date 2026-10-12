@@ -1,11 +1,11 @@
-# Contributing to MaxAds
+# Contributing to Adyard
 
 Thanks for taking the time to contribute! Bug reports, ideas and pull requests
 are welcome.
 
 Good places to start: issues labelled
-[`good first issue`](https://github.com/Juice-de-Orange/maxads/labels/good%20first%20issue)
-and [`help wanted`](https://github.com/Juice-de-Orange/maxads/labels/help%20wanted).
+[`good first issue`](https://github.com/Juice-de-Orange/adyard/labels/good%20first%20issue)
+and [`help wanted`](https://github.com/Juice-de-Orange/adyard/labels/help%20wanted).
 Larger changes are best discussed in an issue first.
 
 ## Before you start

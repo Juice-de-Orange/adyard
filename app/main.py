@@ -1,4 +1,4 @@
-"""MaxAds -- FastAPI application: dashboard, upload and public ad delivery."""
+"""Adyard -- FastAPI application: dashboard, upload and public ad delivery."""
 import logging
 import os
 import random
@@ -22,7 +22,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from . import auth, config, db, media, stats
 from .ratelimit import LoginThrottle
 
-log = logging.getLogger("maxads.web")
+log = logging.getLogger("adyard.web")
 
 BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -74,15 +74,17 @@ def create_app() -> FastAPI:
         ],
     )
 
-    for warning in config.unknown_settings():
+    for warning in config.setting_warnings():
         log.warning(warning)
+    if note := config.database_note():
+        log.log(*note)
 
     db.migrate()
     secret = config.SECRET_KEY or config.load_or_create_secret(
-        "MAXADS_SECRET_KEY", config.BASE_DIR / ".secret_key"
+        "SECRET_KEY", config.BASE_DIR / ".secret_key"
     )
     count_salt = config.COUNT_SALT or config.load_or_create_secret(
-        "MAXADS_COUNT_SALT", config.BASE_DIR / ".count_salt"
+        "COUNT_SALT", config.BASE_DIR / ".count_salt"
     )
 
     with db.session() as conn:
@@ -99,7 +101,7 @@ def create_app() -> FastAPI:
             print("You will be asked to change it on the first login.", file=sys.stderr)
             print("=" * 62, file=sys.stderr, flush=True)
 
-    application = FastAPI(title="MaxAds", docs_url=None, redoc_url=None)
+    application = FastAPI(title="Adyard", docs_url=None, redoc_url=None)
     application.state.count_salt = count_salt
     application.state.login_throttle = LoginThrottle()
 
@@ -114,7 +116,7 @@ def create_app() -> FastAPI:
     # The dashboard session must not ride along on cross-site ad requests.
     application.add_middleware(
         SessionMiddleware, secret_key=secret, same_site="lax", https_only=False,
-        session_cookie="maxads_session",
+        session_cookie="adyard_session",
     )
     application.add_middleware(DashboardCSP)
     # Added last, so it runs first: everything after it sees the real client in
@@ -178,7 +180,7 @@ def wake_worker() -> None:
 
 
 def client_ip(request: Request) -> str:
-    """The client address. Behind a trusted proxy (MAXADS_TRUSTED_PROXIES) the
+    """The client address. Behind a trusted proxy (ADYARD_TRUSTED_PROXIES) the
     proxy middleware has already put the forwarded address here; a header from
     anyone else never gets this far."""
     return request.client.host if request.client else "0.0.0.0"
@@ -516,7 +518,7 @@ def register_routes(app: FastAPI) -> None:
         with db.session() as conn:
             ad = pick_ad(conn, None)
         if ad is None:
-            return Response("/* maxads: no active ad */", media_type="application/javascript",
+            return Response("/* adyard: no active ad */", media_type="application/javascript",
                             headers={"Access-Control-Allow-Origin": "*"})
         return Response(render_snippet(request, ad, width, align, radius),
                         media_type="application/javascript",
@@ -529,7 +531,7 @@ def register_routes(app: FastAPI) -> None:
         with db.session() as conn:
             ad = pick_ad(conn, slug)
         if ad is None:
-            return Response("/* maxads: unknown or inactive ad */",
+            return Response("/* adyard: unknown or inactive ad */",
                             media_type="application/javascript",
                             headers={"Access-Control-Allow-Origin": "*"})
         return Response(render_snippet(request, ad, width, align, radius),
@@ -602,7 +604,7 @@ def register_routes(app: FastAPI) -> None:
         with db.session() as conn:
             ad = pick_ad(conn, None if slug == "random" else slug)
         if ad is None:
-            return HTMLResponse("<!doctype html><title>maxads</title>", status_code=404)
+            return HTMLResponse("<!doctype html><title>adyard</title>", status_code=404)
         return templates.TemplateResponse(request, "frame.html", {
             "ad": dict(ad), "base": config.PUBLIC_URL,
         }, headers={"Access-Control-Allow-Origin": "*"})

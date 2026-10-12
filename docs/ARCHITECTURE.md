@@ -1,4 +1,4 @@
-# How MaxAds is built
+# How Adyard is built
 
 This file explains the **decisions**. What the service does and how to run it is
 in the [README](../README.md); running it without Docker is in
@@ -16,11 +16,11 @@ Reverse proxy (TLS ends here)
    ▼
 web — uvicorn, port 8080
    │
-   ├── reads media from   $MAXADS_BASE/data/media
-   └── writes events to   $MAXADS_BASE/data/db/maxads.db
+   ├── reads media from   $ADYARD_BASE/data/media
+   └── writes events to   $ADYARD_BASE/data/db/adyard.db
 ```
 
-`MAXADS_PUBLIC_URL` must be the address the foreign page reaches, because every
+`ADYARD_PUBLIC_URL` must be the address the foreign page reaches, because every
 snippet, iframe and JSON response builds its URLs from it.
 
 ## Why the media worker is a separate process
@@ -35,7 +35,7 @@ job with `UPDATE … WHERE state='pending'` — that *is* the lock: a second wor
 changes zero rows and moves on. Jobs left in `running` by a killed worker are
 put back after an hour.
 
-It does **not** poll. It blocks on a FIFO under `/run/maxads` (tmpfs) and is woken
+It does **not** poll. It blocks on a FIFO under `/run/adyard` (tmpfs) and is woken
 by the upload; a 300 s timeout is only the safety net. A failed wake-up must never
 fail an upload — the job is in the database and the timeout finds it at the latest.
 
@@ -76,7 +76,7 @@ checked — a lock that still answered "right" or "wrong" would not stop anythin
 A successful login clears both keys.
 
 The counters are in memory (`app/ratelimit.py`), bounded in size and forgotten
-after a day without failures. MaxAds runs one web process, so that is exact;
+after a day without failures. Adyard runs one web process, so that is exact;
 it also means the client addresses involved never reach the database or a log
 file. A restart forgets them.
 
@@ -101,13 +101,13 @@ into an empty directory on the system disk.
 
 So the data directory holds a sentinel file `.mounted`; `ExecStartPre` checks it,
 and `/healthz` reports `data-not-mounted` if it disappears while running. The
-Docker image switches the guard off (`MAXADS_REQUIRE_MOUNT=0`), because a named
+Docker image switches the guard off (`ADYARD_REQUIRE_MOUNT=0`), because a named
 volume cannot drop out on its own.
 
 ## Why the first admin password never reaches the log
 
 There is no public registration, so the first account has to come from
-somewhere. With `MAXADS_ADMIN_PASSWORD` the operator chooses it. Without, a random
+somewhere. With `ADYARD_ADMIN_PASSWORD` the operator chooses it. Without, a random
 password is generated, printed **once to stderr** and the account is locked to
 the password form until it is changed. It never goes through `logging`: the log
 files live on the data disk and would keep the password long after the first
@@ -144,10 +144,19 @@ by one, each in a transaction.
 > `split_statements()`.
 
 File paths in `ads` (`raw_path`, `media_path`, `thumb_path`) are relative to
-`$MAXADS_BASE`, so the data directory can move — another disk, a container
+`$ADYARD_BASE`, so the data directory can move — another disk, a container
 volume, a restore on a new host. v0.1 stored them absolute; every start converts
 the ones under the current data directory (`relativize_media_paths()`, idempotent)
 and logs, without touching, any that lie elsewhere.
+
+The file is `data/db/adyard.db`. Installations from before the rename to adyard
+have `maxads.db`; as long as no `adyard.db` lies next to it, that file is used
+(`config._keep_old()`), and nothing renames it automatically: a rename at start-up
+would race the second process, and a wrong guess here means an empty database
+that looks like lost data. The same rule picks `/var/lib/maxads` as the data
+directory when no base is configured and only that one exists. Settings are read
+as `ADYARD_*` and, failing that, under their old `MAXADS_*` names, with one
+warning per old name at start.
 
 | Table | Purpose |
 |---|---|
