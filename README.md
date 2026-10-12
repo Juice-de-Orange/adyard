@@ -74,13 +74,14 @@ Commands for the Docker setup, run in the checkout. Without Docker:
 **Backup** — while the service runs:
 
 ```bash
-docker compose exec -T web python -m app.backup - > maxads-backup-$(date +%Y%m%d-%H%M%S).tar
+(umask 077; docker compose exec -T web python -m app.backup - > maxads-backup-$(date +%Y%m%d-%H%M%S).tar)
 ```
 
 One tar file with a consistent copy of the database (SQLite's online backup
 API, so nothing that still sits in the write-ahead log is missed), the originals,
 the delivered media and the generated session key and visitor salt. Logs are not
-included. It holds password hashes and secrets: keep it private. To write it into
+included. It holds password hashes and secrets: keep it private (`umask 077`
+makes the file readable for you only). To write it into
 the data volume instead, give a directory: `python -m app.backup /data/backups`.
 
 **Restore** — into the same or a brand-new installation (after
@@ -114,7 +115,7 @@ data volume first, then update as above.
 
 ```bash
 docker compose stop web worker
-docker compose run --rm -T --no-deps web tar -C /data -cf - . > maxads-v0.1-data.tar
+(umask 077; docker compose run --rm -T --no-deps web tar -C /data -cf - . > maxads-v0.1-data.tar)
 ```
 
 (To go back: check out `v0.1.0`, `docker compose build`, `docker compose stop web worker`,

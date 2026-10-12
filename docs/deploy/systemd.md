@@ -74,8 +74,8 @@ the checkout:
 ```bash
 # Backup -- while the service runs. The tar lands in your own home directory.
 cd /opt/maxads
-sudo -u maxads env MAXADS_BASE=/srv/maxads venv/bin/python -m app.backup - \
-  > ~/maxads-backup-$(date +%Y%m%d-%H%M%S).tar
+(umask 077; sudo -u maxads env MAXADS_BASE=/srv/maxads venv/bin/python -m app.backup - \
+  > ~/maxads-backup-$(date +%Y%m%d-%H%M%S).tar)
 
 # Restore -- with both units stopped.
 sudo systemctl stop maxads-worker.service maxads.service
