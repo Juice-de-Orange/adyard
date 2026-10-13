@@ -10,6 +10,8 @@ A small service for running your own banners on your own and friendly sites —
 no ad network, no third-party tracking. It is deliberately boring to operate:
 one Python web process, one media worker, SQLite, and a data directory.
 
+Built with AI assistance.
+
 ## Features
 
 - **Upload and forget.** Images become WebP (animated GIFs stay animated), videos
@@ -34,6 +36,7 @@ one Python web process, one media worker, SQLite, and a data directory.
 ## Quick start
 
 ```bash
+git clone https://github.com/Juice-de-Orange/adyard.git && cd adyard
 cp .env.example .env
 docker compose up -d --build
 docker compose logs web | grep "First admin"   # the generated password, shown once
@@ -259,13 +262,6 @@ other than Chromium.
   start).
 - **Not verified on a real host:** the systemd units and the systemd backup and
   restore commands in `docs/deploy/` (their Python parts were run, systemd was not).
-
-## Built with Claude Code
-
-This project was written with [Claude Code](https://claude.com/claude-code) as a
-pair programmer: design decisions, measurements and reviews were the human's,
-much of the typing was the model's. The commit history of the original private
-repository records that; this public repository starts from a cleaned snapshot.
 
 ## License
 
